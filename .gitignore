@@ -1,0 +1,44 @@
+*.swp
+*.*~
+project.lock.json
+.DS_Store
+*.pyc
+
+# Visual Studio Code
+.vscode
+.vs
+_NCrunch*/
+*ncrunch*
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Release output
+.publish/
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+TestResults/
+
+reports
+chart_dist
+**/requirements.lock
+**/redis-*.tgz
+
+.env
+
+gen-secret.yaml
+.data/
+```
