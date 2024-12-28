@@ -1,0 +1,10 @@
+### Health check
+GET http://localhost:5002/
+
+### Create a new participant
+POST http://localhost:5002/participants
+Content-Type: application/json
+
+{
+    "Name": "John Doe"
+}
