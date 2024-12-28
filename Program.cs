@@ -29,6 +29,7 @@ Console.WriteLine($"Customer deactivated: {customerDeactivated.AggregateId}");
 Console.WriteLine("Press any key to exit...");
 Console.ReadLine();
 
+public abstract class Command<TResponse> : IRequest<TResponse> { }
 public abstract record Event()
 {
     public abstract string Kind { get; }
@@ -44,7 +45,7 @@ public record CustomerDeactivated(string AggregateId) : Event
     public override string Kind => "customer-deactivated";
 }
 
-public class AddCustomerCommand : IRequest<CustomerAcquired>
+public class AddCustomerCommand : Command<CustomerAcquired>
 {
     public string AggregateId { get; init; }
     public AddCustomerCommand(string aggregateId) => AggregateId = aggregateId;
@@ -58,7 +59,7 @@ public class AddCustomerCommandHandler : IRequestHandler<AddCustomerCommand, Cus
     }
 }
 
-public class DeactiveCustomerCommand : IRequest<CustomerDeactivated>
+public class DeactiveCustomerCommand : Command<CustomerDeactivated>
 {
     public string AggregateId { get; init; }
     public DeactiveCustomerCommand(string aggregateId) => AggregateId = aggregateId;
