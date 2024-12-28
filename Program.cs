@@ -15,16 +15,21 @@ using IHost host = Host.CreateDefaultBuilder()
     })
     .Build();
 
+var eventStore = new MemoryEventStore();
+
 using var scope = host.Services.CreateScope();
 var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-var addCustomerCommand = new AddCustomerCommand(GenerateIds.NewId());
-var customerAdded = await mediator.Send(addCustomerCommand);
-Console.WriteLine($"Customer added: {customerAdded.AggregateId}");
+for (var i = 0; i < 10; i++)
+{
+    var addCustomerSlice = new AddCustomerSlice(eventStore, mediator);
+    await addCustomerSlice.AddCustomer();
+}
 
-var deactivateCustomerCommand = new DeactiveCustomerCommand(addCustomerCommand.AggregateId);
-var customerDeactivated = await mediator.Send(deactivateCustomerCommand);
-Console.WriteLine($"Customer deactivated: {customerDeactivated.AggregateId}");
+var deactivateCustomerSlice = new DeactivateCustomerSlice(eventStore, mediator);
+var deactivatedCustomerId = await deactivateCustomerSlice.DeactivateCustomer(eventStore.Events[0].AggregateId);
+
+eventStore.Events.ForEach(Console.WriteLine);
 
 Console.WriteLine("Press any key to exit...");
 Console.ReadLine();
@@ -40,10 +45,12 @@ public record CustomerAcquired(string AggregateId) : Event
 {
     public override string Kind => "customer-added";
 }
+
 public record CustomerDeactivated(string AggregateId) : Event
 {
     public override string Kind => "customer-deactivated";
 }
+
 
 public class AddCustomerCommand : Command<CustomerAcquired>
 {
@@ -59,11 +66,13 @@ public class AddCustomerCommandHandler : IRequestHandler<AddCustomerCommand, Cus
     }
 }
 
+
 public class DeactiveCustomerCommand : Command<CustomerDeactivated>
 {
     public string AggregateId { get; init; }
     public DeactiveCustomerCommand(string aggregateId) => AggregateId = aggregateId;
 }
+
 public class DeactiveCustomerCommandHandler : IRequestHandler<DeactiveCustomerCommand, CustomerDeactivated>
 {
     public Task<CustomerDeactivated> Handle(DeactiveCustomerCommand request, CancellationToken cancellationToken)
@@ -72,6 +81,42 @@ public class DeactiveCustomerCommandHandler : IRequestHandler<DeactiveCustomerCo
     }
 }
 
+public class DeactivateCustomerSlice
+{
+    private readonly IEventStore _eventStore;
+    private readonly IMediator _mediator;
+    public DeactivateCustomerSlice(IEventStore eventStore, IMediator mediator)
+    {
+        _eventStore = eventStore;
+        _mediator = mediator;
+    }
+    public async Task<string> DeactivateCustomer(string customerId)
+    {
+        var deactivateCustomerCommand = new DeactiveCustomerCommand(customerId);
+        var customerDeactivated = await _mediator.Send(deactivateCustomerCommand);
+        await _eventStore.Append("customer", customerDeactivated);
+        return customerId;
+    }
+}
+
+public class AddCustomerSlice
+{
+    private readonly IEventStore _eventStore;
+    private readonly IMediator _mediator;
+    public AddCustomerSlice(IEventStore eventStore, IMediator mediator)
+    {
+        _eventStore = eventStore;
+        _mediator = mediator;
+    }
+    public async Task<string> AddCustomer()
+    {
+        var aggregateId = GenerateIds.NewId();
+        var addCustomerCommand = new AddCustomerCommand(aggregateId);
+        var customerAdded = await _mediator.Send(addCustomerCommand);
+        await _eventStore.Append("customer", customerAdded);
+        return aggregateId;
+    }
+}
 
 public interface IEventStore
 {
