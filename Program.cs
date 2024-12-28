@@ -22,6 +22,10 @@ var addCustomerCommand = new AddCustomerCommand(GenerateIds.NewId());
 var customerAdded = await mediator.Send(addCustomerCommand);
 Console.WriteLine($"Customer added: {customerAdded.AggregateId}");
 
+var deactivateCustomerCommand = new DeactiveCustomerCommand(addCustomerCommand.AggregateId);
+var customerDeactivated = await mediator.Send(deactivateCustomerCommand);
+Console.WriteLine($"Customer deactivated: {customerDeactivated.AggregateId}");
+
 Console.WriteLine("Press any key to exit...");
 Console.ReadLine();
 
@@ -31,22 +35,39 @@ public abstract record Event()
     public abstract string AggregateId { get; init; }
 }
 
-public record CustomerAdded(string AggregateId) : Event
+public record CustomerAcquired(string AggregateId) : Event
 {
     public override string Kind => "customer-added";
 }
+public record CustomerDeactivated(string AggregateId) : Event
+{
+    public override string Kind => "customer-deactivated";
+}
 
-public class AddCustomerCommand : IRequest<CustomerAdded>
+public class AddCustomerCommand : IRequest<CustomerAcquired>
 {
     public string AggregateId { get; init; }
     public AddCustomerCommand(string aggregateId) => AggregateId = aggregateId;
 }
 
-public class AddCustomerCommandHandler : IRequestHandler<AddCustomerCommand, CustomerAdded>
+public class AddCustomerCommandHandler : IRequestHandler<AddCustomerCommand, CustomerAcquired>
 {
-    public Task<CustomerAdded> Handle(AddCustomerCommand request, CancellationToken cancellationToken)
+    public Task<CustomerAcquired> Handle(AddCustomerCommand request, CancellationToken cancellationToken)
     {
-        return Task.FromResult(new CustomerAdded(request.AggregateId));
+        return Task.FromResult(new CustomerAcquired(request.AggregateId));
+    }
+}
+
+public class DeactiveCustomerCommand : IRequest<CustomerDeactivated>
+{
+    public string AggregateId { get; init; }
+    public DeactiveCustomerCommand(string aggregateId) => AggregateId = aggregateId;
+}
+public class DeactiveCustomerCommandHandler : IRequestHandler<DeactiveCustomerCommand, CustomerDeactivated>
+{
+    public Task<CustomerDeactivated> Handle(DeactiveCustomerCommand request, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(new CustomerDeactivated(request.AggregateId));
     }
 }
 
