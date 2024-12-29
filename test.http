@@ -8,3 +8,6 @@ Content-Type: application/json
 {
     "Name": "John Doe"
 }
+
+### Get participant by ID
+GET http://localhost:5002/participants/1001

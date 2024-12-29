@@ -24,6 +24,9 @@ app.MapPost("/participants", async (ParticipantRequest request) =>
     var id = await addParticipantSlice.AddParticipant(request);
     return Results.Created($"/participants/{id}", id);
 });
+app.MapGet("/participants/{id}", (string id) => {
+    return Results.Ok(eventStore.Events.Where(x => x.AggregateId == id));
+});
 
 app.Run();
 
