@@ -6,14 +6,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddMediatR(cfg => 
     cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly())
 );
-builder.Services.AddSingleton<IEventStore, MemoryEventStore>();
+var eventStore = new MemoryEventStore();
+builder.Services.AddSingleton<IEventStore>(eventStore);
 builder.Services.AddSingleton<IMediator, Mediator>();
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqnessBehavior<,>));
 
 var app = builder.Build();
-var mediator = app.Services.GetRequiredService<IMediator>();
-var eventStore = new MemoryEventStore();
 
-eventStore.Events.ForEach(Console.WriteLine);
+var mediator = app.Services.GetRequiredService<IMediator>();
+
 
 app.MapGet("/", () => {
     return Results.Ok(eventStore.Events);
@@ -21,8 +22,16 @@ app.MapGet("/", () => {
 app.MapPost("/participants", async (ParticipantRequest request) => 
 {
     var addParticipantSlice = new AddParticipantSlice(eventStore, mediator);
-    var id = await addParticipantSlice.AddParticipant(request);
-    return Results.Created($"/participants/{id}", id);
+
+    try
+    {
+        var id = await addParticipantSlice.AddParticipant(request);
+        return Results.Created($"/participants/{id}", id);
+    }
+    catch (ParticipantAlreadyExistsException ex)
+    {
+        return Results.Conflict(ex.Message);
+    }
 });
 app.MapGet("/participants/{id}", (string id) => {
     return Results.Ok(eventStore.Events.Where(x => x.AggregateId == id));
@@ -97,10 +106,42 @@ public class AddParticipantSlice : Slice
         var addParticipantCommand = new AddParticipantCommand(participant.Id) { Participant = participant };
         var participantAdded = await mediator.Send(addParticipantCommand);
         await eventStore.Append("participant", participantAdded);
+        Console.WriteLine($"Participant added: {participant.Id}");
         return participant.Id;
     }
 }
 
+public class ParticipantAlreadyExistsException : Exception
+{
+    public ParticipantAlreadyExistsException(string message) : base(message) { }
+}
+
+public class ParticipantUniqnessBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : Command<TResponse>
+{
+    private readonly IEventStore _eventStore;
+    public ParticipantUniqnessBehavior(IEventStore eventStore) => _eventStore = eventStore;
+
+    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
+    {
+        var participant = _eventStore.Events
+            .Where(x => x.Participant?.Name == request.Participant?.Name)
+            .OfType<ParticipantAcquired>()
+            .Select(x => x.Participant)
+            .FirstOrDefault();
+
+        if (participant != null)
+        {
+            throw new ParticipantAlreadyExistsException("Participant already exists");
+        }
+        else
+        {
+            Console.WriteLine("Participant is unique");
+        }
+
+        return await next();
+    }
+}
 
 
 public interface IEventStore

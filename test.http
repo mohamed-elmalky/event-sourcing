@@ -6,7 +6,7 @@ POST http://localhost:5002/participants
 Content-Type: application/json
 
 {
-    "Name": "John Doe"
+    "Name": "eefse Doe"
 }
 
 ### Get participant by ID
