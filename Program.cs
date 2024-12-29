@@ -36,6 +36,11 @@ app.MapPost("/participants", async (ParticipantRequest request) =>
 app.MapGet("/participants/{id}", (string id) => {
     return Results.Ok(eventStore.Events.Where(x => x.AggregateId == id));
 });
+app.MapDelete("/participants/{id}", async (string id) => {
+    var deactivateParticipantSlice = new DeactivateParticipantSlice(mediator, eventStore);
+    await deactivateParticipantSlice.DeactivateParticipant(id);
+    return Results.NoContent();
+});
 
 app.Run();
 
@@ -88,12 +93,15 @@ public class DeactivateParticipantSlice : Slice
 {
     public DeactivateParticipantSlice(IMediator mediator, IEventStore eventStore) : base(mediator, eventStore) { }
 
-    public async Task<string> DeactivateParticipant(string ParticipantId)
+    public async Task<string> DeactivateParticipant(string participantId)
     {
-        var deactivateParticipantCommand = new DeactiveParticipantCommand(ParticipantId);
-        var ParticipantDeactivated = await mediator.Send(deactivateParticipantCommand);
-        await eventStore.Append("Participant", ParticipantDeactivated);
-        return ParticipantId;
+        if (!eventStore.Events.Any(x => x.AggregateId == participantId))
+            return await Task.FromResult(participantId);
+
+        var deactivateParticipantCommand = new DeactiveParticipantCommand(participantId);
+        var participantDeactivated = await mediator.Send(deactivateParticipantCommand);
+        await eventStore.Append("Participant", participantDeactivated);
+        return participantId;
     }
 }
 
@@ -131,13 +139,7 @@ public class ParticipantUniqnessBehavior<TRequest, TResponse> : IPipelineBehavio
             .FirstOrDefault();
 
         if (participant != null)
-        {
             throw new ParticipantAlreadyExistsException("Participant already exists");
-        }
-        else
-        {
-            Console.WriteLine("Participant is unique");
-        }
 
         return await next();
     }

@@ -6,8 +6,11 @@ POST http://localhost:5002/participants
 Content-Type: application/json
 
 {
-    "Name": "eefse Doe"
+    "Name": "ssss Doe"
 }
 
 ### Get participant by ID
 GET http://localhost:5002/participants/1001
+
+### Deactivate participant
+DELETE http://localhost:5002/participants/1005
