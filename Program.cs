@@ -15,9 +15,8 @@ var app = builder.Build();
 
 var mediator = app.Services.GetRequiredService<IMediator>();
 
-
 app.MapGet("/", () => {
-    return Results.Ok(eventStore.Events);
+    return Results.Ok("Hello? Is it me you're looking for?");
 });
 app.MapPost("/participants", async (ParticipantRequest request) => 
 {
@@ -33,19 +32,27 @@ app.MapPost("/participants", async (ParticipantRequest request) =>
         return Results.Conflict(ex.Message);
     }
 });
-app.MapGet("/participants/{id}", (string id) => {
-    return Results.Ok(eventStore.Events.Where(x => x.AggregateId == id));
+app.MapGet("/participants/events/{id}", (string id) => {
+    return Results.Ok(eventStore.Load("participant", id));
 });
 app.MapDelete("/participants/{id}", async (string id) => {
     var deactivateParticipantSlice = new DeactivateParticipantSlice(mediator, eventStore);
     await deactivateParticipantSlice.DeactivateParticipant(id);
     return Results.NoContent();
 });
+app.MapGet("/participants/{id}", async (string id) => {
+    var events = await eventStore.Load("participant", id);
+    var participantProjection = new ParticipantProjection(events);
+    return Results.Ok(participantProjection.Participants[id]);
+});
 
 app.Run();
 
 public record ParticipantRequest(string Name);
-public record Participant(string Id, string Name, bool IsActive);
+public record Participant(string Id, string Name, bool IsActive)
+{
+    public bool IsActive { get; set; } = IsActive;
+}
 
 public abstract record Command<TResponse> : IRequest<TResponse> 
 { 
@@ -145,30 +152,53 @@ public class ParticipantUniqnessBehavior<TRequest, TResponse> : IPipelineBehavio
     }
 }
 
+public class ParticipantProjection
+{
+    public Dictionary<string, Participant> Participants { get; } = [];
+
+    public ParticipantProjection(IEnumerable<Event> events)
+    {
+        foreach (var e in events)
+            Apply(e);
+    }
+
+    private void Apply(Event e)
+    {
+        Participants.TryAdd(e.AggregateId, new Participant(e.AggregateId, string.Empty, true));
+
+        switch (e)
+        {
+            case ParticipantAcquired participantAcquired:
+                Participants[participantAcquired.AggregateId] = participantAcquired.Participant ?? Participants[participantAcquired.AggregateId];
+                break;
+            case ParticipantDeactivated participantDeactivated:
+                Participants[participantDeactivated.AggregateId].IsActive = false;
+                break;
+        }
+    }
+}
 
 public interface IEventStore
 {
-    public List<Event> Events { get; }
+    Task<List<Event>> Load(string aggregateType, string aggregateId);
     Task Append(string aggregateType, Event e);
-    Task Load();
 }
 
 public class MemoryEventStore : IEventStore
 {
-    readonly ConcurrentDictionary<string, List<Event>> _store = new();
-    public List<Event> Events => _store.SelectMany(x => x.Value).ToList();
+    private readonly ConcurrentDictionary<string, List<Event>> _store = new();
+    private string Key(string aggregateType, string aggregateId) => $"{aggregateType.ToLower()}:{aggregateId}";
 
     public Task Append(string aggregateType, Event e)
     {
-        var key = $"{aggregateType.ToLower()}:{e.AggregateId}";
-        var list = _store.GetOrAdd(key, []);
+        var list = _store.GetOrAdd(Key(aggregateType, e.AggregateId), []);
         list.Add(e);
         return Task.CompletedTask;
     }
 
-    public Task Load()
+    public Task<List<Event>> Load(string aggregateType, string aggregateId)
     {
-        throw new NotImplementedException();
+        return Task.FromResult(_store.TryGetValue(Key(aggregateType, aggregateId), out var events) ? events : []);
     }
 }
 

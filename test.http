@@ -10,7 +10,7 @@ Content-Type: application/json
 }
 
 ### Get participant by ID
-GET http://localhost:5002/participants/1001
+GET http://localhost:5002/participants/events/1001
 
 ### Deactivate participant
 DELETE http://localhost:5002/participants/1005
