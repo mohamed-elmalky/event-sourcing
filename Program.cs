@@ -13,23 +13,22 @@ var app = builder.Build();
 var mediator = app.Services.GetRequiredService<IMediator>();
 var eventStore = new MemoryEventStore();
 
-for (var i = 0; i < 10; i++)
-{
-    var addParticipantSlice = new AddParticipantSlice(eventStore, mediator);
-    await addParticipantSlice.AddParticipant();
-}
 eventStore.Events.ForEach(Console.WriteLine);
 
-app.MapGet("/", () => "Hello World!");
+app.MapGet("/", () => {
+    return Results.Ok(eventStore.Events);
+});
 app.MapPost("/participants", async (ParticipantRequest request) => 
 {
     var addParticipantSlice = new AddParticipantSlice(eventStore, mediator);
-    return await addParticipantSlice.AddParticipant();
+    var id = await addParticipantSlice.AddParticipant(request);
+    return Results.Created($"/participants/{id}", id);
 });
 
 app.Run();
 
 public record ParticipantRequest(string Name);
+public record Participant(string Id, string Name, bool IsActive);
 
 public abstract record Command<TResponse> : IRequest<TResponse> 
 { 
@@ -50,7 +49,7 @@ public class AddParticipantCommandHandler : IRequestHandler<AddParticipantComman
     public Task<ParticipantAcquired> Handle(AddParticipantCommand request, CancellationToken cancellationToken)
     {
         var participantAcquired = new ParticipantAcquired(request.AggregateId) { 
-            Participant = new Participant(request.AggregateId, Faker.Name.FullName(), true),
+            Participant = request.Participant,
             OccuredAt = DateTimeOffset.UtcNow
         };
         return Task.FromResult(participantAcquired);
@@ -89,17 +88,17 @@ public class DeactivateParticipantSlice : Slice
 public class AddParticipantSlice : Slice
 {
     public AddParticipantSlice(IEventStore eventStore, IMediator mediator) : base(mediator, eventStore) { }
-    public async Task<string> AddParticipant()
+    public async Task<string> AddParticipant(ParticipantRequest request)
     {
-        var aggregateId = GenerateIds.NewId();
-        var addParticipantCommand = new AddParticipantCommand(aggregateId);
-        var ParticipantAdded = await mediator.Send(addParticipantCommand);
-        await eventStore.Append("Participant", ParticipantAdded);
-        return aggregateId;
+        var participant = new Participant(GenerateIds.NewId(), request.Name, true);
+        var addParticipantCommand = new AddParticipantCommand(participant.Id) { Participant = participant };
+        var participantAdded = await mediator.Send(addParticipantCommand);
+        await eventStore.Append("participant", participantAdded);
+        return participant.Id;
     }
 }
 
-public record Participant(string Id, string Name, bool IsActive);
+
 
 public interface IEventStore
 {
