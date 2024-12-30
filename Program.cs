@@ -50,12 +50,21 @@ app.MapGet("/participants/{id}", async (string id) => {
 
 app.Run();
 
-public record ParticipantRequest(string? Name, string? SSN);
+public record ParticipantRequest
+{
+    public string? Name { get; set; }
+    public string? SSN { get; set; }
+    public string? HomePhone { get; set; }
+    public string? MobilePhone { get; set; }
+}
+
 public record Participant(string Id)
 {
     public bool IsActive { get; set; }
     public string? Name { get; set; }
     public string? SSN { get; set; }
+    public string? HomePhone { get; set; }
+    public string? MobilePhone { get; set; }
 }
 
 public abstract record Command<TResponse> : IRequest<TResponse> 
@@ -121,6 +130,8 @@ public class AddParticipantSlice(IEventStore eventStore, IUniquenessDataStore un
         {
             Name = request.Name,
             SSN = request.SSN,
+            HomePhone = request.HomePhone,
+            MobilePhone = request.MobilePhone,
             IsActive = true
         };
         var addParticipantCommand = new AddParticipantCommand(participant.Id) { Participant = participant };
@@ -200,13 +211,14 @@ public interface IUniquenessDataStore
 public class UniquenessDataStore : IUniquenessDataStore
 {
     private readonly ConcurrentDictionary<string, Participant> _byId = new();
-    private readonly ConcurrentDictionary<string, string> _byName = new();
+    private readonly ConcurrentDictionary<string, string> _byNameAndHomePhoneNumber = new();
+    private readonly ConcurrentDictionary<string, string> _byNameAndMobilePhoneNumber = new();
     private readonly ConcurrentDictionary<string, string> _bySSN = new();
 
     public Task Add(Participant participant)
     {
-        if (participant.Name is not null)
-            _byName.TryAdd(participant.Name, participant.Id);
+        if (participant.Name is not null && participant.HomePhone is not null)
+            _byNameAndHomePhoneNumber.TryAdd(participant.Name, participant.Id);
         
         if (participant.SSN is not null)
             _bySSN.TryAdd(participant.SSN, participant.Id);

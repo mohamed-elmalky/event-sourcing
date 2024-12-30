@@ -7,7 +7,9 @@ Content-Type: application/json
 
 {
     "Name": "eefee Doe",
-    "SSN": "333-45-6789"
+    "SSN": "333-45-6789",
+    "HomePhone": "555-555-5555",
+    "MobilePhone": "555-555-5555"
 }
 
 ### Get participant by ID
