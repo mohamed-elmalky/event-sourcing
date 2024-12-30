@@ -65,6 +65,12 @@ public record Participant(string Id)
     public string? SSN { get; set; }
     public string? HomePhone { get; set; }
     public string? MobilePhone { get; set; }
+    public Address? Address { get; set; }
+}
+
+public record Address(string Address1, string Address2, string City, string State, string Country, string ZipCode)
+{
+    public override string ToString() => $"{Address1}, {Address2}, {City}, {State}, {Country}, {ZipCode}";
 }
 
 public abstract record Command<TResponse> : IRequest<TResponse> 
@@ -169,7 +175,10 @@ public class ParticipantUniqnessBehavior<TRequest, TResponse> : IPipelineBehavio
 
         var uniqueParticipant = await _uniquenessDataStore.IsUnique(request.Participant);
         if (!uniqueParticipant)
+        {
+            Console.WriteLine("Participant is not unique");
             throw new ParticipantAlreadyExistsException("Participant already exists");
+        }
         else
             Console.WriteLine("Participant is unique");
 
@@ -211,17 +220,27 @@ public interface IUniquenessDataStore
 public class UniquenessDataStore : IUniquenessDataStore
 {
     private readonly ConcurrentDictionary<string, Participant> _byId = new();
+    private readonly ConcurrentDictionary<string, string> _bySSN = new();
     private readonly ConcurrentDictionary<string, string> _byNameAndHomePhoneNumber = new();
     private readonly ConcurrentDictionary<string, string> _byNameAndMobilePhoneNumber = new();
-    private readonly ConcurrentDictionary<string, string> _bySSN = new();
+    private readonly ConcurrentDictionary<string, string> _byNameAndAddress = new();
+
+    private string NameAndPhoneNumber(string? name, string? phoneNumber) => $"{name}:{phoneNumber}";
+    private string NameAndAddress(string? name, Address? address) => $"{name}:{address}";
 
     public Task Add(Participant participant)
     {
-        if (participant.Name is not null && participant.HomePhone is not null)
-            _byNameAndHomePhoneNumber.TryAdd(participant.Name, participant.Id);
-        
         if (participant.SSN is not null)
             _bySSN.TryAdd(participant.SSN, participant.Id);
+
+        if (participant.Name is not null && participant.HomePhone is not null)
+            _byNameAndHomePhoneNumber.TryAdd(NameAndPhoneNumber(participant.Name, participant.HomePhone), participant.Id);
+
+        if (participant.Name is not null && participant.MobilePhone is not null)
+            _byNameAndMobilePhoneNumber.TryAdd(NameAndPhoneNumber(participant.Name, participant.MobilePhone), participant.Id);
+        
+        if (participant.Name is not null && participant.Address is not null)
+            _byNameAndAddress.TryAdd(NameAndAddress(participant.Name, participant.Address), participant.Id);
         
         _byId.TryAdd(participant.Id, participant);
 
@@ -230,10 +249,20 @@ public class UniquenessDataStore : IUniquenessDataStore
 
     public Task<bool> IsUnique(Participant participant)
     {
-        var uniqueBySsn = participant.SSN is not null ? !_bySSN.ContainsKey(participant.SSN) : true;
-        var uniqueByName = participant.Name is not null ? !_byName.ContainsKey(participant.Name) : true;
-        Console.WriteLine($"Unique by SSN: {uniqueBySsn}, Unique by Name: {uniqueByName}");
-        return Task.FromResult(uniqueBySsn && uniqueByName);
+        var uniqueBySSN = participant.SSN is null || !_bySSN.ContainsKey(participant.SSN);
+
+        var uniqueByNameAndHomePhoneNumber = !_byNameAndHomePhoneNumber.ContainsKey(NameAndPhoneNumber(participant.Name, participant.HomePhone));
+
+        var uniqueByNameAndMobilePhoneNumber = !_byNameAndMobilePhoneNumber.ContainsKey(NameAndPhoneNumber(participant.Name, participant.MobilePhone));
+
+        var uniqueByNameAndAddress = !_byNameAndAddress.ContainsKey(NameAndAddress(participant.Name, participant.Address));
+        
+        Console.WriteLine($"Unique by SSN: {uniqueBySSN}");
+        Console.WriteLine($"Unique by Name and Home Phone: {uniqueByNameAndHomePhoneNumber}");
+        Console.WriteLine($"Unique by Name and Mobile Phone: {uniqueByNameAndMobilePhoneNumber}");
+        Console.WriteLine($"Unique by Name and Address: {uniqueByNameAndAddress}");
+
+        return Task.FromResult(uniqueBySSN && uniqueByNameAndHomePhoneNumber && uniqueByNameAndMobilePhoneNumber && uniqueByNameAndAddress);
     }
 }
 
