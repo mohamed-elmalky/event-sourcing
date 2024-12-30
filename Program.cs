@@ -7,7 +7,9 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly())
 );
 var eventStore = new MemoryEventStore();
+var uniquenessDataStore = new UniquenessDataStore();
 builder.Services.AddSingleton<IEventStore>(eventStore);
+builder.Services.AddSingleton<IUniquenessDataStore>(uniquenessDataStore);
 builder.Services.AddSingleton<IMediator, Mediator>();
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqnessBehavior<,>));
 
@@ -20,7 +22,7 @@ app.MapGet("/", () => {
 });
 app.MapPost("/participants", async (ParticipantRequest request) => 
 {
-    var addParticipantSlice = new AddParticipantSlice(eventStore, mediator);
+    var addParticipantSlice = new AddParticipantSlice(eventStore, uniquenessDataStore, mediator);
 
     try
     {
@@ -48,10 +50,12 @@ app.MapGet("/participants/{id}", async (string id) => {
 
 app.Run();
 
-public record ParticipantRequest(string Name);
-public record Participant(string Id, string Name, bool IsActive)
+public record ParticipantRequest(string? Name, string? SSN);
+public record Participant(string Id)
 {
-    public bool IsActive { get; set; } = IsActive;
+    public bool IsActive { get; set; }
+    public string? Name { get; set; }
+    public string? SSN { get; set; }
 }
 
 public abstract record Command<TResponse> : IRequest<TResponse> 
@@ -113,7 +117,12 @@ public class AddParticipantSlice(IEventStore eventStore, IUniquenessDataStore un
 {
     public async Task<string> AddParticipant(ParticipantRequest request)
     {
-        var participant = new Participant(GenerateIds.NewId(), request.Name, true);
+        var participant = new Participant(GenerateIds.NewId())
+        {
+            Name = request.Name,
+            SSN = request.SSN,
+            IsActive = true
+        };
         var addParticipantCommand = new AddParticipantCommand(participant.Id) { Participant = participant };
 
         var participantAdded = await mediator.Send(addParticipantCommand);
@@ -142,11 +151,16 @@ public class ParticipantUniqnessBehavior<TRequest, TResponse> : IPipelineBehavio
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         if (request.Participant is null)
+        {
+            Console.WriteLine("Participant is null");
             return await next();
+        }
 
         var uniqueParticipant = await _uniquenessDataStore.IsUnique(request.Participant);
         if (!uniqueParticipant)
             throw new ParticipantAlreadyExistsException("Participant already exists");
+        else
+            Console.WriteLine("Participant is unique");
 
         return await next();
     }
@@ -164,7 +178,7 @@ public class ParticipantProjection
 
     private void Apply(Event e)
     {
-        Participants.TryAdd(e.AggregateId, new Participant(e.AggregateId, string.Empty, true));
+        Participants.TryAdd(e.AggregateId, new Participant(e.AggregateId));
 
         switch (e)
         {
@@ -185,16 +199,29 @@ public interface IUniquenessDataStore
 }
 public class UniquenessDataStore : IUniquenessDataStore
 {
-    private readonly ConcurrentDictionary<string, Participant> _byName = new();
+    private readonly ConcurrentDictionary<string, Participant> _byId = new();
+    private readonly ConcurrentDictionary<string, string> _byName = new();
+    private readonly ConcurrentDictionary<string, string> _bySSN = new();
 
     public Task Add(Participant participant)
     {
-        return Task.FromResult(_byName.TryAdd(participant.Name, participant));
+        if (participant.Name is not null)
+            _byName.TryAdd(participant.Name, participant.Id);
+        
+        if (participant.SSN is not null)
+            _bySSN.TryAdd(participant.SSN, participant.Id);
+        
+        _byId.TryAdd(participant.Id, participant);
+
+        return Task.CompletedTask;
     }
 
     public Task<bool> IsUnique(Participant participant)
     {
-        return Task.FromResult(_byName.ContainsKey(participant.Name));
+        var uniqueBySsn = participant.SSN is not null ? !_bySSN.ContainsKey(participant.SSN) : true;
+        var uniqueByName = participant.Name is not null ? !_byName.ContainsKey(participant.Name) : true;
+        Console.WriteLine($"Unique by SSN: {uniqueBySsn}, Unique by Name: {uniqueByName}");
+        return Task.FromResult(uniqueBySsn && uniqueByName);
     }
 }
 

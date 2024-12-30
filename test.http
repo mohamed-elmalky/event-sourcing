@@ -6,7 +6,8 @@ POST http://localhost:5002/participants
 Content-Type: application/json
 
 {
-    "Name": "ssss Doe"
+    "Name": "eefee Doe",
+    "SSN": "333-45-6789"
 }
 
 ### Get participant by ID
