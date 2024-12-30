@@ -102,26 +102,28 @@ public class DeactivateParticipantSlice : Slice
 
     public async Task<string> DeactivateParticipant(string participantId)
     {
-        if (!eventStore.Events.Any(x => x.AggregateId == participantId))
-            return await Task.FromResult(participantId);
-
         var deactivateParticipantCommand = new DeactiveParticipantCommand(participantId);
         var participantDeactivated = await mediator.Send(deactivateParticipantCommand);
-        await eventStore.Append("Participant", participantDeactivated);
+        await eventStore.Append("participant", participantDeactivated);
         return participantId;
     }
 }
 
-public class AddParticipantSlice : Slice
+public class AddParticipantSlice(IEventStore eventStore, IUniquenessDataStore uniquenessDataStore, IMediator mediator) : Slice(mediator, eventStore)
 {
-    public AddParticipantSlice(IEventStore eventStore, IMediator mediator) : base(mediator, eventStore) { }
     public async Task<string> AddParticipant(ParticipantRequest request)
     {
         var participant = new Participant(GenerateIds.NewId(), request.Name, true);
         var addParticipantCommand = new AddParticipantCommand(participant.Id) { Participant = participant };
+
         var participantAdded = await mediator.Send(addParticipantCommand);
+        
         await eventStore.Append("participant", participantAdded);
+
+        await uniquenessDataStore.Add(participant);
+        
         Console.WriteLine($"Participant added: {participant.Id}");
+        
         return participant.Id;
     }
 }
@@ -131,21 +133,19 @@ public class ParticipantAlreadyExistsException : Exception
     public ParticipantAlreadyExistsException(string message) : base(message) { }
 }
 
-public class ParticipantUniqnessBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : Command<TResponse>
+public class ParticipantUniqnessBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : Command<TResponse>
 {
-    private readonly IEventStore _eventStore;
-    public ParticipantUniqnessBehavior(IEventStore eventStore) => _eventStore = eventStore;
+    private readonly IUniquenessDataStore _uniquenessDataStore;
+
+    public ParticipantUniqnessBehavior(IUniquenessDataStore uniquenessDataStore) => _uniquenessDataStore = uniquenessDataStore;
 
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
-        var participant = _eventStore.Events
-            .Where(x => x.Participant?.Name == request.Participant?.Name)
-            .OfType<ParticipantAcquired>()
-            .Select(x => x.Participant)
-            .FirstOrDefault();
+        if (request.Participant is null)
+            return await next();
 
-        if (participant != null)
+        var uniqueParticipant = await _uniquenessDataStore.IsUnique(request.Participant);
+        if (!uniqueParticipant)
             throw new ParticipantAlreadyExistsException("Participant already exists");
 
         return await next();
@@ -175,6 +175,26 @@ public class ParticipantProjection
                 Participants[participantDeactivated.AggregateId].IsActive = false;
                 break;
         }
+    }
+}
+
+public interface IUniquenessDataStore
+{
+    public Task Add(Participant participant);
+    public Task<bool> IsUnique(Participant participant);
+}
+public class UniquenessDataStore : IUniquenessDataStore
+{
+    private readonly ConcurrentDictionary<string, Participant> _byName = new();
+
+    public Task Add(Participant participant)
+    {
+        return Task.FromResult(_byName.TryAdd(participant.Name, participant));
+    }
+
+    public Task<bool> IsUnique(Participant participant)
+    {
+        return Task.FromResult(_byName.ContainsKey(participant.Name));
     }
 }
 
