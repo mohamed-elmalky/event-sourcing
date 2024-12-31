@@ -7,11 +7,12 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly())
 );
 var eventStore = new MemoryEventStore();
-var uniquenessDataStore = new UniquenessDataStore();
+var uniquenessDataStore = new UniquenessMemoryDataStore();
 builder.Services.AddSingleton<IEventStore>(eventStore);
 builder.Services.AddSingleton<IUniquenessDataStore>(uniquenessDataStore);
 builder.Services.AddSingleton<IMediator, Mediator>();
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqnessBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqueBySSNBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqeByNameAndNumberBehavior<,>));
 
 var app = builder.Build();
 
@@ -159,11 +160,16 @@ public class ParticipantAlreadyExistsException : Exception
     public ParticipantAlreadyExistsException(string message) : base(message) { }
 }
 
-public class ParticipantUniqnessBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : Command<TResponse>
+/// <summary>
+/// Ensures that a participant is unique by name and phone number. This is the second highest priority uniqueness constraint.
+/// </summary>
+/// <typeparam name="TRequest"></typeparam>
+/// <typeparam name="TResponse"></typeparam>
+public class ParticipantUniqeByNameAndNumberBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : AddParticipantCommand
 {
     private readonly IUniquenessDataStore _uniquenessDataStore;
 
-    public ParticipantUniqnessBehavior(IUniquenessDataStore uniquenessDataStore) => _uniquenessDataStore = uniquenessDataStore;
+    public ParticipantUniqeByNameAndNumberBehavior(IUniquenessDataStore uniquenessDataStore) => _uniquenessDataStore = uniquenessDataStore;
 
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
@@ -173,16 +179,62 @@ public class ParticipantUniqnessBehavior<TRequest, TResponse> : IPipelineBehavio
             return await next();
         }
 
-        var uniqueParticipant = await _uniquenessDataStore.IsUnique(request.Participant);
-        if (!uniqueParticipant)
-        {
-            Console.WriteLine("Participant is not unique");
-            throw new ParticipantAlreadyExistsException("Participant already exists");
-        }
+        var nameAndHomePhoneNumber = await _uniquenessDataStore.ByNameAndHomePhoneNumber();
+        var nameAndMobilePhoneNumber = await _uniquenessDataStore.ByNameAndMobilePhoneNumber();
+
+        var uniqueByNameAndHomePhoneNumber = !nameAndHomePhoneNumber.ContainsKey($"{request.Participant.Name}:{request.Participant.HomePhone}");
+        var uniqueByNameAndMobilePhoneNumber = !nameAndMobilePhoneNumber.ContainsKey($"{request.Participant.Name}:{request.Participant.MobilePhone}");
+
+        if (uniqueByNameAndHomePhoneNumber)
+            Console.WriteLine("Participant is unique by name and home phone number");
+        else if (uniqueByNameAndMobilePhoneNumber)
+            Console.WriteLine("Participant is unique by name and mobile phone number");
         else
-            Console.WriteLine("Participant is unique");
+        {
+            Console.WriteLine("Participant already exists with this name and number");
+            throw new ParticipantAlreadyExistsException("Participant already exists with this name and number");
+        }
 
         return await next();
+    }
+}
+
+/// <summary>
+/// Ensures that a participant is unique by SSN. This is the highest priority uniqueness constraint.
+/// </summary>
+/// <typeparam name="TRequest"></typeparam>
+/// <typeparam name="TResponse"></typeparam>
+public class ParticipantUniqueBySSNBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : AddParticipantCommand where TResponse : ParticipantAcquired
+{
+    private readonly IUniquenessDataStore _uniquenessDataStore;
+
+    public ParticipantUniqueBySSNBehavior(IUniquenessDataStore uniquenessDataStore) => _uniquenessDataStore = uniquenessDataStore;
+
+    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
+    {
+        if (request.Participant is null || request.Participant.SSN is null)
+        {
+            Console.WriteLine("Participant is null");
+            return await next();
+        }
+
+        var ssns = await _uniquenessDataStore.BySSN();
+        var uniqueBySSN = !ssns.ContainsKey(request.Participant.SSN);
+        if (uniqueBySSN)
+        {
+            Console.WriteLine("Unique by SSN");
+            var participantAcquired = new ParticipantAcquired(request.AggregateId) { 
+                Participant = request.Participant,
+                OccuredAt = DateTimeOffset.UtcNow
+            };
+            return (TResponse)participantAcquired;
+        }
+        else
+        {
+            Console.WriteLine("Participant already exists with this SSN");
+            throw new ParticipantAlreadyExistsException("Participant already exists with this SSN");
+        }
+
     }
 }
 
@@ -215,54 +267,66 @@ public class ParticipantProjection
 public interface IUniquenessDataStore
 {
     public Task Add(Participant participant);
-    public Task<bool> IsUnique(Participant participant);
-}
-public class UniquenessDataStore : IUniquenessDataStore
-{
-    private readonly ConcurrentDictionary<string, Participant> _byId = new();
-    private readonly ConcurrentDictionary<string, string> _bySSN = new();
-    private readonly ConcurrentDictionary<string, string> _byNameAndHomePhoneNumber = new();
-    private readonly ConcurrentDictionary<string, string> _byNameAndMobilePhoneNumber = new();
-    private readonly ConcurrentDictionary<string, string> _byNameAndAddress = new();
+    public Task<ConcurrentDictionary<string, Participant>> ById();
+    public Task<ConcurrentDictionary<string, string>> BySSN();
+    public Task<ConcurrentDictionary<string, string>> ByNameAndHomePhoneNumber();
+    public Task<ConcurrentDictionary<string, string>> ByNameAndMobilePhoneNumber();
+    public Task<ConcurrentDictionary<string, string>> ByNameAndAddress();
 
-    private string NameAndPhoneNumber(string? name, string? phoneNumber) => $"{name}:{phoneNumber}";
-    private string NameAndAddress(string? name, Address? address) => $"{name}:{address}";
+}
+public class UniquenessMemoryDataStore : IUniquenessDataStore
+{
+    public readonly ConcurrentDictionary<string, Participant> ById = new();
+    public readonly ConcurrentDictionary<string, string> BySSN = new();
+    public readonly ConcurrentDictionary<string, string> ByNameAndHomePhoneNumber = new();
+    public readonly ConcurrentDictionary<string, string> ByNameAndMobilePhoneNumber = new();
+    public readonly ConcurrentDictionary<string, string> ByNameAndAddress = new();
+
+    public string NameAndPhoneNumber(string? name, string? phoneNumber) => $"{name}:{phoneNumber}";
+    public string NameAndAddress(string? name, Address? address) => $"{name}:{address}";
 
     public Task Add(Participant participant)
     {
         if (participant.SSN is not null)
-            _bySSN.TryAdd(participant.SSN, participant.Id);
+            BySSN.TryAdd(participant.SSN, participant.Id);
 
         if (participant.Name is not null && participant.HomePhone is not null)
-            _byNameAndHomePhoneNumber.TryAdd(NameAndPhoneNumber(participant.Name, participant.HomePhone), participant.Id);
+            ByNameAndHomePhoneNumber.TryAdd(NameAndPhoneNumber(participant.Name, participant.HomePhone), participant.Id);
 
         if (participant.Name is not null && participant.MobilePhone is not null)
-            _byNameAndMobilePhoneNumber.TryAdd(NameAndPhoneNumber(participant.Name, participant.MobilePhone), participant.Id);
+            ByNameAndMobilePhoneNumber.TryAdd(NameAndPhoneNumber(participant.Name, participant.MobilePhone), participant.Id);
         
         if (participant.Name is not null && participant.Address is not null)
-            _byNameAndAddress.TryAdd(NameAndAddress(participant.Name, participant.Address), participant.Id);
+            ByNameAndAddress.TryAdd(NameAndAddress(participant.Name, participant.Address), participant.Id);
         
-        _byId.TryAdd(participant.Id, participant);
+        ById.TryAdd(participant.Id, participant);
 
         return Task.CompletedTask;
     }
 
-    public Task<bool> IsUnique(Participant participant)
+    Task<ConcurrentDictionary<string, Participant>> IUniquenessDataStore.ById()
     {
-        var uniqueBySSN = participant.SSN is null || !_bySSN.ContainsKey(participant.SSN);
+        return Task.FromResult(ById);
+    }
 
-        var uniqueByNameAndHomePhoneNumber = !_byNameAndHomePhoneNumber.ContainsKey(NameAndPhoneNumber(participant.Name, participant.HomePhone));
+    Task<ConcurrentDictionary<string, string>> IUniquenessDataStore.BySSN()
+    {
+        return Task.FromResult(BySSN);
+    }
 
-        var uniqueByNameAndMobilePhoneNumber = !_byNameAndMobilePhoneNumber.ContainsKey(NameAndPhoneNumber(participant.Name, participant.MobilePhone));
+    Task<ConcurrentDictionary<string, string>> IUniquenessDataStore.ByNameAndHomePhoneNumber()
+    {
+        return Task.FromResult(ByNameAndHomePhoneNumber);
+    }
 
-        var uniqueByNameAndAddress = !_byNameAndAddress.ContainsKey(NameAndAddress(participant.Name, participant.Address));
-        
-        Console.WriteLine($"Unique by SSN: {uniqueBySSN}");
-        Console.WriteLine($"Unique by Name and Home Phone: {uniqueByNameAndHomePhoneNumber}");
-        Console.WriteLine($"Unique by Name and Mobile Phone: {uniqueByNameAndMobilePhoneNumber}");
-        Console.WriteLine($"Unique by Name and Address: {uniqueByNameAndAddress}");
+    Task<ConcurrentDictionary<string, string>> IUniquenessDataStore.ByNameAndMobilePhoneNumber()
+    {
+        return Task.FromResult(ByNameAndMobilePhoneNumber);
+    }
 
-        return Task.FromResult(uniqueBySSN && uniqueByNameAndHomePhoneNumber && uniqueByNameAndMobilePhoneNumber && uniqueByNameAndAddress);
+    Task<ConcurrentDictionary<string, string>> IUniquenessDataStore.ByNameAndAddress()
+    {
+        return Task.FromResult(ByNameAndAddress);
     }
 }
 
