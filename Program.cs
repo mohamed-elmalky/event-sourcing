@@ -8,12 +8,14 @@ builder.Services.AddMediatR(cfg =>
 );
 var eventStore = new MemoryEventStore();
 var uniquenessDataStore = new UniquenessMemoryDataStore();
+
 builder.Services.AddSingleton<IEventStore>(eventStore);
 builder.Services.AddSingleton<IUniquenessDataStore>(uniquenessDataStore);
 builder.Services.AddSingleton<IMediator, Mediator>();
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqueBySSNBehavior<,>));
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqeByNameAndHomePhoneNumberBehavior<,>));
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqueByNameAndMobileNumberBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqueByNameAndEmailBehavior<,>));
 
 var app = builder.Build();
 
@@ -58,6 +60,8 @@ public record ParticipantRequest
     public string? SSN { get; set; }
     public string? HomePhone { get; set; }
     public string? MobilePhone { get; set; }
+    public Address? Address { get; set; }
+    public string? Email { get; set; }
 }
 
 public record Participant(string Id)
@@ -68,6 +72,7 @@ public record Participant(string Id)
     public string? HomePhone { get; set; }
     public string? MobilePhone { get; set; }
     public Address? Address { get; set; }
+    public string? Email { get; set; }
 }
 
 public record Address(string Address1, string Address2, string City, string State, string Country, string ZipCode)
@@ -149,18 +154,17 @@ public class AddParticipantSlice(IEventStore eventStore, IUniquenessDataStore un
             SSN = request.SSN,
             HomePhone = request.HomePhone,
             MobilePhone = request.MobilePhone,
-            IsActive = true
+            IsActive = true,
+            Address = request.Address,
+            Email = request.Email
         };
         var addParticipantCommand = new AddParticipantCommand(participant.Id) { Participant = participant };
 
-        var participantAdded = await mediator.Send (addParticipantCommand);
-        
-        await eventStore.Append("participant", participantAdded);
-
+        var participantAdded = await mediator.Send(addParticipantCommand); // This will trigger the pipeline behaviors. If the participant is not unique, an exception will be thrown.
+        await eventStore.Append("participant", participantAdded); // We won't reach this point if the participant is not unique.
         await uniquenessDataStore.Add(participant);
         
         Console.WriteLine($"Participant added: {participant.Id}");
-        
         return participant.Id;
     }
 }
@@ -168,6 +172,35 @@ public class AddParticipantSlice(IEventStore eventStore, IUniquenessDataStore un
 public class ParticipantAlreadyExistsException(string message) : Exception(message)
 {
     public string? ParticipantId { get; set; } 
+}
+
+public class ParticipantUniqueByNameAndEmailBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : AddParticipantCommand
+{
+    private readonly IUniquenessDataStore _uniquenessDataStore;
+
+    public ParticipantUniqueByNameAndEmailBehavior(IUniquenessDataStore uniquenessDataStore) => _uniquenessDataStore = uniquenessDataStore;
+
+    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
+    {
+        if (request.Participant is null || string.IsNullOrEmpty(request.Participant.Name) || string.IsNullOrEmpty(request.Participant.Email))
+        {
+            Console.WriteLine("\u2705 Name and email");
+            return await next();
+        }
+
+        var nameAndEmail = await _uniquenessDataStore.ByNameAndEmail();
+        nameAndEmail.TryGetValue($"{request.Participant.Name}:{request.Participant.Email}", out var participantId);
+        var particpantIsUnique = participantId is null;
+        if (particpantIsUnique)
+            Console.WriteLine("\u2705 Name and email");
+        else
+        {
+            Console.WriteLine("\u274C Exists with this name and email");
+            throw new ParticipantAlreadyExistsException("Participant already exists with this name and email") { ParticipantId = participantId };
+        }
+
+        return await next();
+    }
 }
 
 /// <summary>
@@ -303,18 +336,17 @@ public interface IUniquenessDataStore
     public Task<ConcurrentDictionary<string, string>> ByNameAndHomePhoneNumber();
     public Task<ConcurrentDictionary<string, string>> ByNameAndMobilePhoneNumber();
     public Task<ConcurrentDictionary<string, string>> ByNameAndAddress();
+    public Task<ConcurrentDictionary<string, string>> ByNameAndEmail();
 
 }
 public class UniquenessMemoryDataStore : IUniquenessDataStore
 {
-    public readonly ConcurrentDictionary<string, Participant> ById = new();
-    public readonly ConcurrentDictionary<string, string> BySSN = new();
-    public readonly ConcurrentDictionary<string, string> ByNameAndHomePhoneNumber = new();
-    public readonly ConcurrentDictionary<string, string> ByNameAndMobilePhoneNumber = new();
-    public readonly ConcurrentDictionary<string, string> ByNameAndAddress = new();
-
-    public string NameAndPhoneNumber(string? name, string? phoneNumber) => $"{name}:{phoneNumber}";
-    public string NameAndAddress(string? name, Address? address) => $"{name}:{address}";
+    private readonly ConcurrentDictionary<string, Participant> ById = new();
+    private readonly ConcurrentDictionary<string, string> BySSN = new();
+    private readonly ConcurrentDictionary<string, string> ByNameAndHomePhoneNumber = new();
+    private readonly ConcurrentDictionary<string, string> ByNameAndMobilePhoneNumber = new();
+    private readonly ConcurrentDictionary<string, string> ByNameAndAddress = new();
+    private readonly ConcurrentDictionary<string, string> ByNameAndEmail = new();
 
     public Task Add(Participant participant)
     {
@@ -322,13 +354,16 @@ public class UniquenessMemoryDataStore : IUniquenessDataStore
             BySSN.TryAdd(participant.SSN, participant.Id);
 
         if (participant.Name is not null && participant.HomePhone is not null)
-            ByNameAndHomePhoneNumber.TryAdd(NameAndPhoneNumber(participant.Name, participant.HomePhone), participant.Id);
+            ByNameAndHomePhoneNumber.TryAdd($"{participant.Name}:{participant.HomePhone}", participant.Id);
 
         if (participant.Name is not null && participant.MobilePhone is not null)
-            ByNameAndMobilePhoneNumber.TryAdd(NameAndPhoneNumber(participant.Name, participant.MobilePhone), participant.Id);
+            ByNameAndMobilePhoneNumber.TryAdd($"{participant.Name}:{participant.MobilePhone}", participant.Id);
         
         if (participant.Name is not null && participant.Address is not null)
-            ByNameAndAddress.TryAdd(NameAndAddress(participant.Name, participant.Address), participant.Id);
+            ByNameAndAddress.TryAdd($"{participant.Name}:{participant.Address}", participant.Id);
+        
+        if (participant.Name is not null && participant.Email is not null)
+            ByNameAndEmail.TryAdd($"{participant.Name}:{participant.Email}", participant.Id);
         
         ById.TryAdd(participant.Id, participant);
 
@@ -358,6 +393,11 @@ public class UniquenessMemoryDataStore : IUniquenessDataStore
     Task<ConcurrentDictionary<string, string>> IUniquenessDataStore.ByNameAndAddress()
     {
         return Task.FromResult(ByNameAndAddress);
+    }
+
+    Task<ConcurrentDictionary<string, string>> IUniquenessDataStore.ByNameAndEmail()
+    {
+        return Task.FromResult(ByNameAndEmail);
     }
 }
 
