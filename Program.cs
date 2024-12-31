@@ -50,7 +50,9 @@ app.MapDelete("/participants/{id}", async (string id) => {
 });
 app.MapGet("/participants/{id}", async (string id) => {
     var events = await eventStore.Load("participant", id);
-    var participantProjection = new ParticipantProjection(events);
+    Console.WriteLine($"Events: {events.Count}");
+    var participantProjection = new ParticipantProjection();
+    participantProjection.Load(events);
     return Results.Ok(participantProjection.Participants[id]);
 });
 
@@ -336,7 +338,7 @@ public class ParticipantProjection
 {
     public Dictionary<string, Participant> Participants { get; } = [];
 
-    public ParticipantProjection(IEnumerable<Event> events)
+    public void Load(IEnumerable<Event> events)
     {
         foreach (var e in events)
             Apply(e);
