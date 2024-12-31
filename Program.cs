@@ -12,10 +12,12 @@ var uniquenessDataStore = new UniquenessMemoryDataStore();
 builder.Services.AddSingleton<IEventStore>(eventStore);
 builder.Services.AddSingleton<IUniquenessDataStore>(uniquenessDataStore);
 builder.Services.AddSingleton<IMediator, Mediator>();
+
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqueBySSNBehavior<,>));
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqeByNameAndHomePhoneNumberBehavior<,>));
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqueByNameAndMobileNumberBehavior<,>));
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqueByNameAndEmailBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqueByNameAndAddressBehavior<,>));
 
 var app = builder.Build();
 
@@ -125,7 +127,7 @@ public class DeactiveParticipantCommandHandler : IRequestHandler<DeactivePartici
     }
 }
 
-public class Slice(IMediator mediator, IEventStore eventStore)
+public abstract class Slice(IMediator mediator, IEventStore eventStore)
 {
     protected readonly IMediator mediator = mediator;
     protected readonly IEventStore eventStore = eventStore;
@@ -302,6 +304,34 @@ public class ParticipantUniqueBySSNBehavior<TRequest, TResponse> : IPipelineBeha
     }
 }
 
+public class ParticipantUniqueByNameAndAddressBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : AddParticipantCommand
+{
+    private readonly IUniquenessDataStore _uniquenessDataStore;
+
+    public ParticipantUniqueByNameAndAddressBehavior(IUniquenessDataStore uniquenessDataStore) => _uniquenessDataStore = uniquenessDataStore;
+
+    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
+    {
+        if (request.Participant is null || string.IsNullOrEmpty(request.Participant.Name) || request.Participant.Address is null)
+        {
+            Console.WriteLine("\u2705 Name and address");
+            return await next();
+        }
+
+        var nameAndAddress = await _uniquenessDataStore.ByNameAndAddress();
+        nameAndAddress.TryGetValue($"{request.Participant.Name}:{request.Participant.Address}", out var participantId);
+        var particpantIsUnique = participantId is null;
+        if (particpantIsUnique)
+            Console.WriteLine("\u2705 Name and address");
+        else
+        {
+            Console.WriteLine("\u274C Exists with this name and address");
+            throw new ParticipantAlreadyExistsException("Participant already exists with this name and address") { ParticipantId = participantId };
+        }
+
+        return await next();
+    }
+}
 public class ParticipantProjection
 {
     public Dictionary<string, Participant> Participants { get; } = [];
@@ -358,12 +388,12 @@ public class UniquenessMemoryDataStore : IUniquenessDataStore
 
         if (participant.Name is not null && participant.MobilePhone is not null)
             ByNameAndMobilePhoneNumber.TryAdd($"{participant.Name}:{participant.MobilePhone}", participant.Id);
-        
-        if (participant.Name is not null && participant.Address is not null)
-            ByNameAndAddress.TryAdd($"{participant.Name}:{participant.Address}", participant.Id);
-        
+
         if (participant.Name is not null && participant.Email is not null)
             ByNameAndEmail.TryAdd($"{participant.Name}:{participant.Email}", participant.Id);
+
+        if (participant.Name is not null && participant.Address is not null)
+            ByNameAndAddress.TryAdd($"{participant.Name}:{participant.Address}", participant.Id);
         
         ById.TryAdd(participant.Id, participant);
 
