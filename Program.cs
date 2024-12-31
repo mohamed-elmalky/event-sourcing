@@ -32,7 +32,7 @@ app.MapPost("/participants", async (ParticipantRequest request) =>
     }
     catch (ParticipantAlreadyExistsException ex)
     {
-        return Results.Conflict(new { message = ex.Message, id = 1 });
+        return Results.Conflict(new { message = ex.Message, id = ex.ParticipantId });
     }
 });
 app.MapGet("/participants/events/{id}", (string id) => {
@@ -164,9 +164,9 @@ public class AddParticipantSlice(IEventStore eventStore, IUniquenessDataStore un
     }
 }
 
-public class ParticipantAlreadyExistsException : Exception
+public class ParticipantAlreadyExistsException(string message) : Exception(message)
 {
-    public ParticipantAlreadyExistsException(string message) : base(message) { }
+    public string? ParticipantId { get; set; } 
 }
 
 /// <summary>
@@ -223,13 +223,14 @@ public class ParticipantUniqueBySSNBehavior<TRequest, TResponse> : IPipelineBeha
     {
         if (request.Participant is null || request.Participant.SSN is null)
         {
-            Console.WriteLine("Participant is null");
+            Console.WriteLine("Participant or SSN is null. Moving to next behavior check");
             return await next();
         }
 
         var ssns = await _uniquenessDataStore.BySSN();
-        var uniqueBySSN = !ssns.ContainsKey(request.Participant.SSN);
-        if (uniqueBySSN)
+        ssns.TryGetValue(request.Participant.SSN, out var participantId);
+        var particpantIsUnique = participantId is null;
+        if (particpantIsUnique)
         {
             Console.WriteLine("Unique by SSN");
             return (TResponse)request.ToEvent(); // Not really happy with creating the event here, but it's the only way I can short-circuit the pipeline for this specific behavior.
@@ -237,7 +238,7 @@ public class ParticipantUniqueBySSNBehavior<TRequest, TResponse> : IPipelineBeha
         else
         {
             Console.WriteLine("Participant already exists with this SSN");
-            throw new ParticipantAlreadyExistsException("Participant already exists with this SSN");
+            throw new ParticipantAlreadyExistsException("Participant already exists with this SSN") { ParticipantId = participantId };
         }
 
     }
