@@ -7,8 +7,8 @@ Content-Type: application/json
 
 {
     "Name": "john doe",
-    "SSN": "333-45-2345",
-    "HomePhone": "222-555-5555",
+    "SSN": "",
+    "HomePhone": "4543-555-5555",
     "MobilePhone": "666-555-5555"
 }
 

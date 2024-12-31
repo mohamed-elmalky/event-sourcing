@@ -12,7 +12,7 @@ builder.Services.AddSingleton<IEventStore>(eventStore);
 builder.Services.AddSingleton<IUniquenessDataStore>(uniquenessDataStore);
 builder.Services.AddSingleton<IMediator, Mediator>();
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqueBySSNBehavior<,>));
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqeByNameAndNumberBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqeByNameAndHomePhoneNumberBehavior<,>));
 
 var app = builder.Build();
 
@@ -152,7 +152,7 @@ public class AddParticipantSlice(IEventStore eventStore, IUniquenessDataStore un
         };
         var addParticipantCommand = new AddParticipantCommand(participant.Id) { Participant = participant };
 
-        var participantAdded = await mediator.Send(addParticipantCommand);
+        var participantAdded = await mediator.Send (addParticipantCommand);
         
         await eventStore.Append("participant", participantAdded);
 
@@ -174,34 +174,26 @@ public class ParticipantAlreadyExistsException(string message) : Exception(messa
 /// </summary>
 /// <typeparam name="TRequest"></typeparam>
 /// <typeparam name="TResponse"></typeparam>
-public class ParticipantUniqeByNameAndNumberBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : AddParticipantCommand
+public class ParticipantUniqeByNameAndHomePhoneNumberBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : AddParticipantCommand
 {
     private readonly IUniquenessDataStore _uniquenessDataStore;
 
-    public ParticipantUniqeByNameAndNumberBehavior(IUniquenessDataStore uniquenessDataStore) => _uniquenessDataStore = uniquenessDataStore;
+    public ParticipantUniqeByNameAndHomePhoneNumberBehavior(IUniquenessDataStore uniquenessDataStore) => _uniquenessDataStore = uniquenessDataStore;
 
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
-        if (request.Participant is null)
-        {
-            Console.WriteLine("Participant is null");
+        if (request.Participant is null || string.IsNullOrEmpty(request.Participant.Name) || string.IsNullOrEmpty(request.Participant.HomePhone))
             return await next();
-        }
 
         var nameAndHomePhoneNumber = await _uniquenessDataStore.ByNameAndHomePhoneNumber();
-        var nameAndMobilePhoneNumber = await _uniquenessDataStore.ByNameAndMobilePhoneNumber();
-
-        var uniqueByNameAndHomePhoneNumber = !nameAndHomePhoneNumber.ContainsKey($"{request.Participant.Name}:{request.Participant.HomePhone}");
-        var uniqueByNameAndMobilePhoneNumber = !nameAndMobilePhoneNumber.ContainsKey($"{request.Participant.Name}:{request.Participant.MobilePhone}");
-
-        if (uniqueByNameAndHomePhoneNumber)
-            Console.WriteLine("Participant is unique by name and home phone number");
-        else if (uniqueByNameAndMobilePhoneNumber)
-            Console.WriteLine("Participant is unique by name and mobile phone number");
+        nameAndHomePhoneNumber.TryGetValue($"{request.Participant.Name}:{request.Participant.HomePhone}", out var participantId);
+        var particpantIsUnique = participantId is null;
+        if (particpantIsUnique)
+            Console.WriteLine("\u2705 Name and home phone number");
         else
         {
-            Console.WriteLine("Participant already exists with this name and number");
-            throw new ParticipantAlreadyExistsException("Participant already exists with this name and number");
+            Console.WriteLine("\u274C Exists with this name and home phone number");
+            throw new ParticipantAlreadyExistsException("Participant already exists with this name and number") { ParticipantId = participantId };
         }
 
         return await next();
@@ -221,23 +213,20 @@ public class ParticipantUniqueBySSNBehavior<TRequest, TResponse> : IPipelineBeha
 
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
-        if (request.Participant is null || request.Participant.SSN is null)
-        {
-            Console.WriteLine("Participant or SSN is null. Moving to next behavior check");
+        if (request.Participant is null || string.IsNullOrEmpty(request.Participant.SSN))
             return await next();
-        }
 
         var ssns = await _uniquenessDataStore.BySSN();
         ssns.TryGetValue(request.Participant.SSN, out var participantId);
         var particpantIsUnique = participantId is null;
         if (particpantIsUnique)
         {
-            Console.WriteLine("Unique by SSN");
+            Console.WriteLine("\u2705 SSN");
             return (TResponse)request.ToEvent(); // Not really happy with creating the event here, but it's the only way I can short-circuit the pipeline for this specific behavior.
         }
         else
         {
-            Console.WriteLine("Participant already exists with this SSN");
+            Console.WriteLine("\u274C Exists with this SSN");
             throw new ParticipantAlreadyExistsException("Participant already exists with this SSN") { ParticipantId = participantId };
         }
 
@@ -293,7 +282,7 @@ public class UniquenessMemoryDataStore : IUniquenessDataStore
 
     public Task Add(Participant participant)
     {
-        if (participant.SSN is not null)
+        if (!string.IsNullOrEmpty(participant.SSN))
             BySSN.TryAdd(participant.SSN, participant.Id);
 
         if (participant.Name is not null && participant.HomePhone is not null)
