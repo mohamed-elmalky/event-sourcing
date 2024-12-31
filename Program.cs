@@ -13,6 +13,7 @@ builder.Services.AddSingleton<IUniquenessDataStore>(uniquenessDataStore);
 builder.Services.AddSingleton<IMediator, Mediator>();
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqueBySSNBehavior<,>));
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqeByNameAndHomePhoneNumberBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqueByNameAndMobileNumberBehavior<,>));
 
 var app = builder.Build();
 
@@ -183,7 +184,10 @@ public class ParticipantUniqeByNameAndHomePhoneNumberBehavior<TRequest, TRespons
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         if (request.Participant is null || string.IsNullOrEmpty(request.Participant.Name) || string.IsNullOrEmpty(request.Participant.HomePhone))
+        {
+            Console.WriteLine("\u2705 Name and home phone number");
             return await next();
+        }
 
         var nameAndHomePhoneNumber = await _uniquenessDataStore.ByNameAndHomePhoneNumber();
         nameAndHomePhoneNumber.TryGetValue($"{request.Participant.Name}:{request.Participant.HomePhone}", out var participantId);
@@ -193,6 +197,35 @@ public class ParticipantUniqeByNameAndHomePhoneNumberBehavior<TRequest, TRespons
         else
         {
             Console.WriteLine("\u274C Exists with this name and home phone number");
+            throw new ParticipantAlreadyExistsException("Participant already exists with this name and number") { ParticipantId = participantId };
+        }
+
+        return await next();
+    }
+}
+
+public class ParticipantUniqueByNameAndMobileNumberBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : AddParticipantCommand
+{
+    private readonly IUniquenessDataStore _uniquenessDataStore;
+
+    public ParticipantUniqueByNameAndMobileNumberBehavior(IUniquenessDataStore uniquenessDataStore) => _uniquenessDataStore = uniquenessDataStore;
+
+    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
+    {
+        if (request.Participant is null || string.IsNullOrEmpty(request.Participant.Name) || string.IsNullOrEmpty(request.Participant.MobilePhone))
+        {
+            Console.WriteLine("\u2705 Name and mobile phone number");
+            return await next();
+        }
+
+        var nameAndMobilePhoneNumber = await _uniquenessDataStore.ByNameAndMobilePhoneNumber();
+        nameAndMobilePhoneNumber.TryGetValue($"{request.Participant.Name}:{request.Participant.MobilePhone}", out var participantId);
+        var particpantIsUnique = participantId is null;
+        if (particpantIsUnique)
+            Console.WriteLine("\u2705 Name and mobile phone number");
+        else
+        {
+            Console.WriteLine("\u274C Exists with this name and mobile phone number");
             throw new ParticipantAlreadyExistsException("Participant already exists with this name and number") { ParticipantId = participantId };
         }
 
@@ -214,7 +247,10 @@ public class ParticipantUniqueBySSNBehavior<TRequest, TResponse> : IPipelineBeha
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         if (request.Participant is null || string.IsNullOrEmpty(request.Participant.SSN))
+        {
+            Console.WriteLine("\u2705 SSN");
             return await next();
+        }
 
         var ssns = await _uniquenessDataStore.BySSN();
         ssns.TryGetValue(request.Participant.SSN, out var participantId);
