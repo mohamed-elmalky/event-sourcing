@@ -32,7 +32,7 @@ app.MapPost("/participants", async (ParticipantRequest request) =>
     }
     catch (ParticipantAlreadyExistsException ex)
     {
-        return Results.Conflict(ex.Message);
+        return Results.Conflict(new { message = ex.Message, id = 1 });
     }
 });
 app.MapGet("/participants/events/{id}", (string id) => {
@@ -77,6 +77,7 @@ public record Address(string Address1, string Address2, string City, string Stat
 public abstract record Command<TResponse> : IRequest<TResponse> 
 { 
     public abstract string AggregateId { get; init; }
+    public abstract TResponse ToEvent();
     public Participant? Participant { get; set; }
 }
 public abstract record Event(string Kind)
@@ -87,26 +88,34 @@ public abstract record Event(string Kind)
 }
 
 public record ParticipantAcquired(string AggregateId) : Event("participant-acquired");
-public record AddParticipantCommand(string AggregateId) : Command<ParticipantAcquired>;
+public record AddParticipantCommand(string AggregateId) : Command<ParticipantAcquired>
+{
+    public override ParticipantAcquired ToEvent() => new(AggregateId) { 
+        Participant = Participant,
+        OccuredAt = DateTimeOffset.UtcNow
+    };
+}
 public class AddParticipantCommandHandler : IRequestHandler<AddParticipantCommand, ParticipantAcquired>
 {
     public Task<ParticipantAcquired> Handle(AddParticipantCommand request, CancellationToken cancellationToken)
     {
-        var participantAcquired = new ParticipantAcquired(request.AggregateId) { 
-            Participant = request.Participant,
-            OccuredAt = DateTimeOffset.UtcNow
-        };
-        return Task.FromResult(participantAcquired);
+        return Task.FromResult(request.ToEvent());
     }
 }
 
 public record ParticipantDeactivated(string AggregateId) : Event("participant-deactivated");
-public record DeactiveParticipantCommand(string AggregateId) : Command<ParticipantDeactivated>;
+public record DeactiveParticipantCommand(string AggregateId) : Command<ParticipantDeactivated>
+{
+    public override ParticipantDeactivated ToEvent() => new(AggregateId) { 
+        Participant = Participant,
+        OccuredAt = DateTimeOffset.UtcNow
+    };
+}
 public class DeactiveParticipantCommandHandler : IRequestHandler<DeactiveParticipantCommand, ParticipantDeactivated>
 {
     public Task<ParticipantDeactivated> Handle(DeactiveParticipantCommand request, CancellationToken cancellationToken)
     {
-        return Task.FromResult(new ParticipantDeactivated(request.AggregateId));
+        return Task.FromResult(request.ToEvent());
     }
 }
 
@@ -223,12 +232,7 @@ public class ParticipantUniqueBySSNBehavior<TRequest, TResponse> : IPipelineBeha
         if (uniqueBySSN)
         {
             Console.WriteLine("Unique by SSN");
-            // Not really happy with creating the event here, but it's the only way I can short-circuit the pipeline for this specific behavior.
-            var participantAcquired = new ParticipantAcquired(request.AggregateId) { 
-                Participant = request.Participant,
-                OccuredAt = DateTimeOffset.UtcNow
-            };
-            return (TResponse)participantAcquired;
+            return (TResponse)request.ToEvent(); // Not really happy with creating the event here, but it's the only way I can short-circuit the pipeline for this specific behavior.
         }
         else
         {
