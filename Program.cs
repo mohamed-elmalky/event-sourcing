@@ -200,7 +200,7 @@ public class ParticipantUniqeByNameAndNumberBehavior<TRequest, TResponse> : IPip
 }
 
 /// <summary>
-/// Ensures that a participant is unique by SSN. This is the highest priority uniqueness constraint.
+/// Ensures that a participant is unique by SSN. This is the highest priority uniqueness constraint. It short-circuits the pipeline if the participant is unique.
 /// </summary>
 /// <typeparam name="TRequest"></typeparam>
 /// <typeparam name="TResponse"></typeparam>
@@ -223,6 +223,7 @@ public class ParticipantUniqueBySSNBehavior<TRequest, TResponse> : IPipelineBeha
         if (uniqueBySSN)
         {
             Console.WriteLine("Unique by SSN");
+            // Not really happy with creating the event here, but it's the only way I can short-circuit the pipeline for this specific behavior.
             var participantAcquired = new ParticipantAcquired(request.AggregateId) { 
                 Participant = request.Participant,
                 OccuredAt = DateTimeOffset.UtcNow
