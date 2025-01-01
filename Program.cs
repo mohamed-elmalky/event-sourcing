@@ -192,10 +192,8 @@ public class ParticipantUniqueByNameAndEmailBehavior<TRequest, TResponse> : IPip
             return await next();
         }
 
-        var nameAndEmail = await _uniquenessDataStore.ByNameAndEmail();
-        nameAndEmail.TryGetValue($"{request.Participant.Name}:{request.Participant.Email}", out var participantId);
-        var particpantIsUnique = participantId is null;
-        if (particpantIsUnique)
+        var participantId = await _uniquenessDataStore.ByNameAndEmail($"{request.Participant.Name}:{request.Participant.Email}");
+        if (participantId is null)
             Console.WriteLine("\u2705 Name and email");
         else
         {
@@ -226,10 +224,8 @@ public class ParticipantUniqeByNameAndHomePhoneNumberBehavior<TRequest, TRespons
             return await next();
         }
 
-        var nameAndHomePhoneNumber = await _uniquenessDataStore.ByNameAndHomePhoneNumber();
-        nameAndHomePhoneNumber.TryGetValue($"{request.Participant.Name}:{request.Participant.HomePhone}", out var participantId);
-        var particpantIsUnique = participantId is null;
-        if (particpantIsUnique)
+        var participantId = await _uniquenessDataStore.ByNameAndHomePhoneNumber($"{request.Participant.Name}:{request.Participant.HomePhone}");
+        if (participantId is null)
             Console.WriteLine("\u2705 Name and home phone number");
         else
         {
@@ -255,10 +251,8 @@ public class ParticipantUniqueByNameAndMobileNumberBehavior<TRequest, TResponse>
             return await next();
         }
 
-        var nameAndMobilePhoneNumber = await _uniquenessDataStore.ByNameAndMobilePhoneNumber();
-        nameAndMobilePhoneNumber.TryGetValue($"{request.Participant.Name}:{request.Participant.MobilePhone}", out var participantId);
-        var particpantIsUnique = participantId is null;
-        if (particpantIsUnique)
+        var participantId = await _uniquenessDataStore.ByNameAndMobilePhoneNumber($"{request.Participant.Name}:{request.Participant.MobilePhone}");
+        if (participantId is null)
             Console.WriteLine("\u2705 Name and mobile phone number");
         else
         {
@@ -289,10 +283,8 @@ public class ParticipantUniqueBySSNBehavior<TRequest, TResponse> : IPipelineBeha
             return await next();
         }
 
-        var ssns = await _uniquenessDataStore.BySSN();
-        ssns.TryGetValue(request.Participant.SSN, out var participantId);
-        var particpantIsUnique = participantId is null;
-        if (particpantIsUnique)
+        var participantId = await _uniquenessDataStore.BySSN(request.Participant.SSN);
+        if (participantId is null)
         {
             Console.WriteLine("\u2705 SSN");
             return (TResponse)request.ToEvent(); // Not really happy with creating the event here, but it's the only way I can short-circuit the pipeline for this specific behavior.
@@ -320,10 +312,11 @@ public class ParticipantUniqueByNameAndAddressBehavior<TRequest, TResponse> : IP
             return await next();
         }
 
-        var nameAndAddress = await _uniquenessDataStore.ByNameAndAddress();
-        nameAndAddress.TryGetValue($"{request.Participant.Name}:{request.Participant.Address}", out var participantId);
-        var particpantIsUnique = participantId is null;
-        if (particpantIsUnique)
+        // var nameAndAddress = await _uniquenessDataStore.ByNameAndAddress();
+        // nameAndAddress.TryGetValue($"{request.Participant.Name}:{request.Participant.Address}", out var participantId);
+        // var particpantIsUnique = participantId is null;
+        var participantId = await _uniquenessDataStore.ByNameAndAddress($"{request.Participant.Name}:{request.Participant.Address}");
+        if (participantId is null)
             Console.WriteLine("\u2705 Name and address");
         else
         {
@@ -363,12 +356,12 @@ public class ParticipantProjection
 public interface IUniquenessDataStore
 {
     public Task Add(Participant participant);
-    public Task<ConcurrentDictionary<string, Participant>> ById();
-    public Task<ConcurrentDictionary<string, string>> BySSN();
-    public Task<ConcurrentDictionary<string, string>> ByNameAndHomePhoneNumber();
-    public Task<ConcurrentDictionary<string, string>> ByNameAndMobilePhoneNumber();
-    public Task<ConcurrentDictionary<string, string>> ByNameAndAddress();
-    public Task<ConcurrentDictionary<string, string>> ByNameAndEmail();
+    public Task<Participant?> ById(string key);
+    public Task<string?> BySSN(string key);
+    public Task<string?> ByNameAndHomePhoneNumber(string key);
+    public Task<string?> ByNameAndMobilePhoneNumber(string key);
+    public Task<string?> ByNameAndAddress(string key);
+    public Task<string?> ByNameAndEmail(string key);
 
 }
 public class UniquenessMemoryDataStore : IUniquenessDataStore
@@ -402,34 +395,34 @@ public class UniquenessMemoryDataStore : IUniquenessDataStore
         return Task.CompletedTask;
     }
 
-    Task<ConcurrentDictionary<string, Participant>> IUniquenessDataStore.ById()
+    Task<Participant?> IUniquenessDataStore.ById(string key)
     {
-        return Task.FromResult(ById);
+        return Task.FromResult(ById.TryGetValue(key, out var participant) ? participant : null);
     }
 
-    Task<ConcurrentDictionary<string, string>> IUniquenessDataStore.BySSN()
+    Task<string?> IUniquenessDataStore.ByNameAndAddress(string key)
     {
-        return Task.FromResult(BySSN);
+        return Task.FromResult(ByNameAndAddress.TryGetValue(key, out var participantId) ? participantId : null);
     }
 
-    Task<ConcurrentDictionary<string, string>> IUniquenessDataStore.ByNameAndHomePhoneNumber()
+    Task<string?> IUniquenessDataStore.ByNameAndEmail(string key)
     {
-        return Task.FromResult(ByNameAndHomePhoneNumber);
+        return Task.FromResult(ByNameAndEmail.TryGetValue(key, out var participantId) ? participantId : null);
     }
 
-    Task<ConcurrentDictionary<string, string>> IUniquenessDataStore.ByNameAndMobilePhoneNumber()
+    Task<string?> IUniquenessDataStore.ByNameAndHomePhoneNumber(string key)
     {
-        return Task.FromResult(ByNameAndMobilePhoneNumber);
+        return Task.FromResult(ByNameAndHomePhoneNumber.TryGetValue(key, out var participantId) ? participantId : null);
     }
 
-    Task<ConcurrentDictionary<string, string>> IUniquenessDataStore.ByNameAndAddress()
+    Task<string?> IUniquenessDataStore.ByNameAndMobilePhoneNumber(string key)
     {
-        return Task.FromResult(ByNameAndAddress);
+        return Task.FromResult(ByNameAndMobilePhoneNumber.TryGetValue(key, out var participantId) ? participantId : null);
     }
 
-    Task<ConcurrentDictionary<string, string>> IUniquenessDataStore.ByNameAndEmail()
+    Task<string?> IUniquenessDataStore.BySSN(string key)
     {
-        return Task.FromResult(ByNameAndEmail);
+        return Task.FromResult(BySSN.TryGetValue(key, out var participantId) ? participantId : null);
     }
 }
 
