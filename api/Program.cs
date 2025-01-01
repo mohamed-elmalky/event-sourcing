@@ -452,3 +452,5 @@ public static class GenerateIds
     private static int _id = 1000;
     public static string NewId() => (++_id).ToString();
 }
+
+public partial class Program {}
