@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Newtonsoft.Json.Linq;
 using FluentAssertions;
 using System.Net.Http.Json;
+using PersonEvents;
+using Shared;
 
 namespace tests;
 
@@ -66,7 +68,7 @@ public class UnitTest1 : IClassFixture<WebApplicationFactory<Program>>
         response2.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var responseContent = await response2.Content.ReadAsStringAsync();
         var json = JObject.Parse(responseContent);
-        var id = json["id"].ToString();
+        var id = json["id"]?.ToString();
         id.Should().Be(participantId);
     }
 
@@ -88,7 +90,7 @@ public class UnitTest1 : IClassFixture<WebApplicationFactory<Program>>
         response2.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var responseContent = await response2.Content.ReadAsStringAsync();
         var json = JObject.Parse(responseContent);
-        var id = json["id"].ToString();
+        var id = json["id"]?.ToString();
         id.Should().Be(participantId);
     }
 
@@ -110,7 +112,7 @@ public class UnitTest1 : IClassFixture<WebApplicationFactory<Program>>
         response2.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var responseContent = await response2.Content.ReadAsStringAsync();
         var json = JObject.Parse(responseContent);
-        var id = json["id"].ToString();
+        var id = json["id"]?.ToString();
         id.Should().Be(participantId);
     }
 
@@ -132,7 +134,7 @@ public class UnitTest1 : IClassFixture<WebApplicationFactory<Program>>
         response2.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var responseContent = await response2.Content.ReadAsStringAsync();
         var json = JObject.Parse(responseContent);
-        var id = json["id"].ToString();
+        var id = json["id"]?.ToString();
         id.Should().Be(participantId);
     }
 }
