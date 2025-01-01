@@ -2,6 +2,9 @@
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Newtonsoft.Json.Linq;
+using FluentAssertions;
+using System.Net.Http.Json;
 
 namespace tests;
 
@@ -56,10 +59,15 @@ public class UnitTest1 : IClassFixture<WebApplicationFactory<Program>>
         var response = await _client.PostAsync(url, data);
         // Assert
         response.EnsureSuccessStatusCode();
+        var participantId = await response.Content.ReadFromJsonAsync<string>();
 
         // try to create another participant with the same SSN
         var response2 = await _client.PostAsync(url, data);
-        Assert.Equal(HttpStatusCode.Conflict, response2.StatusCode);
+        response2.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var responseContent = await response2.Content.ReadAsStringAsync();
+        var json = JObject.Parse(responseContent);
+        var id = json["id"].ToString();
+        id.Should().Be(participantId);
     }
 
     [Fact]
@@ -73,10 +81,15 @@ public class UnitTest1 : IClassFixture<WebApplicationFactory<Program>>
         var response = await _client.PostAsync(url, data);
         // Assert
         response.EnsureSuccessStatusCode();
+        var participantId = await response.Content.ReadFromJsonAsync<string>();
 
         // try to create another participant with the same name and home phone
         var response2 = await _client.PostAsync(url, data);
-        Assert.Equal(HttpStatusCode.Conflict, response2.StatusCode);
+        response2.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var responseContent = await response2.Content.ReadAsStringAsync();
+        var json = JObject.Parse(responseContent);
+        var id = json["id"].ToString();
+        id.Should().Be(participantId);
     }
 
     [Fact]
@@ -90,10 +103,15 @@ public class UnitTest1 : IClassFixture<WebApplicationFactory<Program>>
         var response = await _client.PostAsync(url, data);
         // Assert
         response.EnsureSuccessStatusCode();
+        var participantId = await response.Content.ReadFromJsonAsync<string>();
 
         // try to create another participant with the same name and cell phone
         var response2 = await _client.PostAsync(url, data);
-        Assert.Equal(HttpStatusCode.Conflict, response2.StatusCode);
+        response2.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var responseContent = await response2.Content.ReadAsStringAsync();
+        var json = JObject.Parse(responseContent);
+        var id = json["id"].ToString();
+        id.Should().Be(participantId);
     }
 
     [Fact]
@@ -107,9 +125,14 @@ public class UnitTest1 : IClassFixture<WebApplicationFactory<Program>>
         var response = await _client.PostAsync(url, data);
         // Assert
         response.EnsureSuccessStatusCode();
+        var participantId = await response.Content.ReadFromJsonAsync<string>();
 
         // try to create another participant with the same name and address
         var response2 = await _client.PostAsync(url, data);
-        Assert.Equal(HttpStatusCode.Conflict, response2.StatusCode);
+        response2.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var responseContent = await response2.Content.ReadAsStringAsync();
+        var json = JObject.Parse(responseContent);
+        var id = json["id"].ToString();
+        id.Should().Be(participantId);
     }
 }
