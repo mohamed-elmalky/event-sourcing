@@ -312,9 +312,6 @@ public class ParticipantUniqueByNameAndAddressBehavior<TRequest, TResponse> : IP
             return await next();
         }
 
-        // var nameAndAddress = await _uniquenessDataStore.ByNameAndAddress();
-        // nameAndAddress.TryGetValue($"{request.Participant.Name}:{request.Participant.Address}", out var participantId);
-        // var particpantIsUnique = participantId is null;
         var participantId = await _uniquenessDataStore.ByNameAndAddress($"{request.Participant.Name}:{request.Participant.Address}");
         if (participantId is null)
             Console.WriteLine("\u2705 Name and address");
