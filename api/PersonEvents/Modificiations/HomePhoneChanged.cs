@@ -9,7 +9,7 @@ public record PersonHomePhoneChanged(string AggregateId) : Event("person-home-ph
     public string? HomePhone { get; init; }
 }
 
-public record ModifyPersonHomePhoneCommand(string AggregateId) : Command<PersonHomePhoneChanged>
+public record ModifyPersonHomePhoneCommand(string AggregateId) : Command(AggregateId), IRequest<PersonHomePhoneChanged>
 {
     public string? HomePhone { get; init; }
     public override PersonHomePhoneChanged ToEvent() => new(AggregateId) { 

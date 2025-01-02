@@ -9,7 +9,7 @@ public record PersonSSNChanged(string AggregateId) : Event("person-ssn-changed")
     public string? SSN { get; init; }
 }
 
-public record ModifyPersonSSNCommand(string AggregateId) : Command<PersonSSNChanged>
+public record ModifyPersonSSNCommand(string AggregateId) : Command(AggregateId), IRequest<PersonSSNChanged>
 {
     public string? SSN { get; init; }
     public override PersonSSNChanged ToEvent() => new(AggregateId) { 

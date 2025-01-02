@@ -31,7 +31,7 @@ public record OrganizationAcquired(string AggregateId) : Event("participant-orga
     public Organization? ParticipantOrganization { get; init; }
 }
 
-public record AddOrganizationCommand(string AggregateId) : Command<OrganizationAcquired>
+public record AddOrganizationCommand(string AggregateId) : Command(AggregateId), IRequest<OrganizationAcquired>
 {
     public Organization? ParticipantOrganization { get; init; }
     public override OrganizationAcquired ToEvent() => new(AggregateId) { 

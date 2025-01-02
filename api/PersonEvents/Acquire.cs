@@ -9,7 +9,7 @@ public record PersonAcquired(string AggregateId) : Event("person-acquired")
 {
     public Person? Participant { get; init; }
 }
-public record AddPersonCommand(string AggregateId) : Command<PersonAcquired>
+public record AddPersonCommand(string AggregateId) : Command(AggregateId), IRequest<PersonAcquired>
 {
     public Person? Participant { get; init; }
     public override PersonAcquired ToEvent() => new(AggregateId) { 
@@ -29,7 +29,7 @@ public class AddPersonSlice(IEventStore eventStore, IUniquenessDataStore uniquen
 {
     public async Task<string> AddParticipant(PersonRequest request)
     {
-        var participant = request.ToModel(GenerateIds.NewId()); 
+        var participant = request.ToModel(GenerateIds.NewId());
         var addParticipantCommand = new AddPersonCommand(participant.Id) { Participant = participant };
 
         var participantAdded = await mediator.Send(addParticipantCommand); // This will trigger the pipeline behaviors. If the participant is not unique, an exception will be thrown.

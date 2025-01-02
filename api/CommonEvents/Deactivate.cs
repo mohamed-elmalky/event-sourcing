@@ -5,7 +5,7 @@ using Persistence;
 namespace CommonEvents;
 
 public record ParticipantDeactivated(string AggregateId) : Event("participant-deactivated");
-public record DeactiveParticipantCommand(string AggregateId) : Command<ParticipantDeactivated>
+public record DeactiveParticipantCommand(string AggregateId) : Command(AggregateId), IRequest<ParticipantDeactivated>
 {
     public override ParticipantDeactivated ToEvent() => new(AggregateId) { 
         OccuredAt = DateTimeOffset.UtcNow

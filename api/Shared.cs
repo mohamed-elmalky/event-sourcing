@@ -3,10 +3,9 @@ using Persistence;
 
 namespace Shared;
 
-public abstract record Command<TResponse> : IRequest<TResponse> 
+public abstract record Command(string AggregateId)
 { 
-    public abstract string AggregateId { get; init; }
-    public abstract TResponse ToEvent();
+    public abstract Event ToEvent();
 }
 public abstract record Event(string Kind)
 {
