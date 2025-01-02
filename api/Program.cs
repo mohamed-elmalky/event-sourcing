@@ -6,6 +6,7 @@ using CommonEvents;
 using PersonEvents;
 using OrganizationEvents;
 using Persistence;
+using Models;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddMediatR(cfg => 
@@ -34,6 +35,7 @@ var apiGroup = app.MapGroup("/participants");
 apiGroup.MapGet("/", () => {
     return Results.Ok("Hello? Is it me you're looking for?");
 });
+
 apiGroup.MapPost("/person", async (PersonRequest request) => 
 {
     var addParticipantSlice = new AddPersonSlice(eventStore, uniquenessDataStore, mediator);
@@ -57,6 +59,9 @@ apiGroup.MapGet("/person/{id}", async (string id) => {
     var participantProjection = new PersonProjection();
     participantProjection.Load(events);
     return Results.Ok(participantProjection.Participants[id]);
+});
+apiGroup.MapPatch("/person/{id}", async (string id, PersonRequest request) => {
+    
 });
 
 apiGroup.MapDelete("/participants/{id}", async (string id) => {

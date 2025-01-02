@@ -1,31 +1,11 @@
 using MediatR;
+using Models;
 using Persistence;
 using Shared;
 
 namespace PersonEvents;
 
-public record Person(string Id) : Participant(Id)
-{
-    public bool IsActive { get; set; }
-    public string? Name { get; set; }
-    public string? SSN { get; set; }
-    public string? HomePhone { get; set; }
-    public string? MobilePhone { get; set; }
-    public Address? Address { get; set; }
-    public string? Email { get; set; }
-}
-
-public record PersonRequest
-{
-    public string? Name { get; set; }
-    public string? SSN { get; set; }
-    public string? HomePhone { get; set; }
-    public string? MobilePhone { get; set; }
-    public Address? Address { get; set; }
-    public string? Email { get; set; }
-}
-
-public record PersonAcquired(string AggregateId) : Event("participant-acquired")
+public record PersonAcquired(string AggregateId) : Event("person-acquired")
 {
     public Person? Participant { get; init; }
 }
@@ -49,16 +29,7 @@ public class AddPersonSlice(IEventStore eventStore, IUniquenessDataStore uniquen
 {
     public async Task<string> AddParticipant(PersonRequest request)
     {
-        var participant = new Person(GenerateIds.NewId())
-        {
-            Name = request.Name,
-            SSN = request.SSN,
-            HomePhone = request.HomePhone,
-            MobilePhone = request.MobilePhone,
-            IsActive = true,
-            Address = request.Address,
-            Email = request.Email
-        };
+        var participant = request.ToModel(GenerateIds.NewId()); 
         var addParticipantCommand = new AddPersonCommand(participant.Id) { Participant = participant };
 
         var participantAdded = await mediator.Send(addParticipantCommand); // This will trigger the pipeline behaviors. If the participant is not unique, an exception will be thrown.
@@ -69,5 +40,3 @@ public class AddPersonSlice(IEventStore eventStore, IUniquenessDataStore uniquen
         return participant.Id;
     }
 }
-
-

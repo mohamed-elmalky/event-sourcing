@@ -7,6 +7,7 @@ using FluentAssertions;
 using System.Net.Http.Json;
 using PersonEvents;
 using Shared;
+using Models;
 
 namespace tests;
 

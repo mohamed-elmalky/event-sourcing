@@ -1,4 +1,5 @@
 using CommonEvents;
+using Models;
 using Shared;
 
 namespace PersonEvents;
