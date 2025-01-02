@@ -8,6 +8,8 @@ public class PersonProjection
 {
     public Dictionary<string, Person> Participants { get; } = [];
 
+    public Person? GetPersonById(string id) => Participants.TryGetValue(id, out var participant) ? participant : null;
+
     public void Load(IEnumerable<Event> events)
     {
         foreach (var e in events)
