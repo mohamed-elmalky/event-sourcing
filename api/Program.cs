@@ -54,11 +54,10 @@ apiGroup.MapGet("/person/events/{id}", (string id) => {
     return Results.Ok(eventStore.Load("participant", id));
 });
 apiGroup.MapGet("/person/{id}", async (string id) => {
-    var events = await eventStore.Load("participant", id);
-    Console.WriteLine($"Events: {events.Count}");
     var participantProjection = new PersonProjection();
-    participantProjection.Load(events);
-    return Results.Ok(participantProjection.Participants[id]);
+    participantProjection.Load(await eventStore.Load("participant", id));
+    var person = participantProjection.GetPersonById(id);
+    return person != null ? Results.Ok(person) : Results.NotFound();
 });
 apiGroup.MapPatch("/person/{id}", async (string id, PersonRequest request) => {
     
