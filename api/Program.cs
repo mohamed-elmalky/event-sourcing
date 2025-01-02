@@ -18,6 +18,7 @@ builder.Services.AddSingleton<IEventStore>(eventStore);
 builder.Services.AddSingleton<IUniquenessDataStore>(uniquenessDataStore);
 builder.Services.AddSingleton<IMediator, Mediator>();
 
+// Registering person uniqueness check behaviors. These will run in the order below. Note that SSN behavior is the highest priority and will short-circuit the rest.
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PersonUniqueBySSNBehavior<,>));
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PersonUniqeByNameAndHomePhoneNumberBehavior<,>));
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PersonUniqueByNameAndMobileNumberBehavior<,>));
@@ -28,32 +29,29 @@ var app = builder.Build();
 
 var mediator = app.Services.GetRequiredService<IMediator>();
 
-app.MapGet("/", () => {
+var apiGroup = app.MapGroup("/participants");
+
+apiGroup.MapGet("/", () => {
     return Results.Ok("Hello? Is it me you're looking for?");
 });
-app.MapPost("/participants", async (PersonRequest request) => 
+apiGroup.MapPost("/person", async (PersonRequest request) => 
 {
     var addParticipantSlice = new AddPersonSlice(eventStore, uniquenessDataStore, mediator);
 
     try
     {
         var id = await addParticipantSlice.AddParticipant(request);
-        return Results.Created($"/participants/{id}", id);
+        return Results.Created($"/participants/person/{id}", id);
     }
     catch (ParticipantAlreadyExistsException ex)
     {
         return Results.Conflict(new { message = ex.Message, id = ex.ParticipantId });
     }
 });
-app.MapGet("/participants/events/{id}", (string id) => {
+apiGroup.MapGet("/person/events/{id}", (string id) => {
     return Results.Ok(eventStore.Load("participant", id));
 });
-app.MapDelete("/participants/{id}", async (string id) => {
-    var deactivateParticipantSlice = new DeactivateParticipantSlice(mediator, eventStore);
-    await deactivateParticipantSlice.DeactivateParticipant(id);
-    return Results.NoContent();
-});
-app.MapGet("/participants/{id}", async (string id) => {
+apiGroup.MapGet("/person/{id}", async (string id) => {
     var events = await eventStore.Load("participant", id);
     Console.WriteLine($"Events: {events.Count}");
     var participantProjection = new PersonProjection();
@@ -61,13 +59,12 @@ app.MapGet("/participants/{id}", async (string id) => {
     return Results.Ok(participantProjection.Participants[id]);
 });
 
+apiGroup.MapDelete("/participants/{id}", async (string id) => {
+    var deactivateParticipantSlice = new DeactivateParticipantSlice(mediator, eventStore);
+    await deactivateParticipantSlice.DeactivateParticipant(id);
+    return Results.NoContent();
+});
+
 app.Run();
-
-
-
-
-
-
-
 
 public partial class Program {}

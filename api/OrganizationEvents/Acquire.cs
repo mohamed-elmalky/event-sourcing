@@ -11,35 +11,35 @@ public record Organization(string Id) : Participant(Id)
     public Address? Address { get; set; }
 }
 
-public record ParticipantOrganizationAcquired(string AggregateId) : Event("participant-organization-acquired")
+public record OrganizationAcquired(string AggregateId) : Event("participant-organization-acquired")
 {
     public Organization? ParticipantOrganization { get; init; }
 }
 
-public record AddParticipantOrganizationCommand(string AggregateId) : Command<ParticipantOrganizationAcquired>
+public record AddOrganizationCommand(string AggregateId) : Command<OrganizationAcquired>
 {
     public Organization? ParticipantOrganization { get; init; }
-    public override ParticipantOrganizationAcquired ToEvent() => new(AggregateId) { 
+    public override OrganizationAcquired ToEvent() => new(AggregateId) { 
         ParticipantOrganization = ParticipantOrganization,
         OccuredAt = DateTimeOffset.UtcNow
     };
 }
 
-public class AddParticipantOrganizationCommandHandler : IRequestHandler<AddParticipantOrganizationCommand, ParticipantOrganizationAcquired>
+public class AddOrganizationCommandHandler : IRequestHandler<AddOrganizationCommand, OrganizationAcquired>
 {
-    public Task<ParticipantOrganizationAcquired> Handle(AddParticipantOrganizationCommand request, CancellationToken cancellationToken)
+    public Task<OrganizationAcquired> Handle(AddOrganizationCommand request, CancellationToken cancellationToken)
     {
         return Task.FromResult(request.ToEvent());
     }
 }
 
-public class AddParticipantOrganizationSlice : Slice
+public class AddOrganizationSlice : Slice
 {
-    public AddParticipantOrganizationSlice(IMediator mediator, IEventStore eventStore) : base(mediator, eventStore) { }
+    public AddOrganizationSlice(IMediator mediator, IEventStore eventStore) : base(mediator, eventStore) { }
 
     public async Task<string> AddParticipantOrganization(Organization participantOrganization)
     {
-        var addParticipantOrganizationCommand = new AddParticipantOrganizationCommand(participantOrganization.Id) { ParticipantOrganization = participantOrganization };
+        var addParticipantOrganizationCommand = new AddOrganizationCommand(participantOrganization.Id) { ParticipantOrganization = participantOrganization };
         var participantOrganizationAdded = await mediator.Send(addParticipantOrganizationCommand);
         await eventStore.Append("participant-organization", participantOrganizationAdded);
         Console.WriteLine($"Participant organization added: {participantOrganization.Id}");

@@ -1,5 +1,8 @@
 ### Health check
-GET http://localhost:5002/
+GET http://localhost:5002/participants
+
+### 
+GET http://localhost:5002/participants/health
 
 ### Create a new participant
 POST http://localhost:5002/participants
