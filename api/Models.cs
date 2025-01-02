@@ -1,8 +1,8 @@
 namespace Models;
 
-public abstract record Participant(string Id);
+public abstract record Participant(string? Id);
 
-public record Person(string Id) : Participant(Id)
+public record Person(string? Id) : Participant(Id)
 {
     public bool IsActive { get; set; }
     public string? Name { get; set; }
@@ -15,6 +15,7 @@ public record Person(string Id) : Participant(Id)
 
 public record PersonRequest
 {
+    public string? Id { get; set; }
     public string? Name { get; set; }
     public string? SSN { get; set; }
     public string? HomePhone { get; set; }
@@ -22,7 +23,7 @@ public record PersonRequest
     public Address? Address { get; set; }
     public string? Email { get; set; }
 
-    public Person ToModel(string id) => new(id)
+    public Person ToModel() => new(Id)
     {
         Name = Name,
         SSN = SSN,
