@@ -3,9 +3,9 @@ using Shared;
 
 namespace PersonEvents;
 
-public class ParticipantProjection
+public class PersonProjection
 {
-    public Dictionary<string, Participant> Participants { get; } = [];
+    public Dictionary<string, Person> Participants { get; } = [];
 
     public void Load(IEnumerable<Event> events)
     {
@@ -15,11 +15,11 @@ public class ParticipantProjection
 
     private void Apply(Event e)
     {
-        Participants.TryAdd(e.AggregateId, new Participant(e.AggregateId));
+        Participants.TryAdd(e.AggregateId, new Person(e.AggregateId));
 
         switch (e)
         {
-            case ParticipantAcquired participantAcquired:
+            case PersonAcquired participantAcquired:
                 Participants[participantAcquired.AggregateId] = participantAcquired.Participant ?? Participants[participantAcquired.AggregateId];
                 break;
             case ParticipantDeactivated participantDeactivated:

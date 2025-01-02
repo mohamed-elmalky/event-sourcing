@@ -35,7 +35,7 @@ public class UnitTest1 : IClassFixture<WebApplicationFactory<Program>>
     {
         // Arrange
         var url = "/participants";
-        var participant = new Participant("some-id") { Name = "John Doe" };
+        var participant = new Person("some-id") { Name = "John Doe" };
         var json = JsonSerializer.Serialize(participant);
         var data = new StringContent(json, Encoding.UTF8, "application/json");
         // Act
@@ -55,7 +55,7 @@ public class UnitTest1 : IClassFixture<WebApplicationFactory<Program>>
     {
         // Arrange
         var url = "/participants";
-        var participant = new Participant("some-id") { Name = "John Doe", SSN = "123-45-6789" };
+        var participant = new Person("some-id") { Name = "John Doe", SSN = "123-45-6789" };
         var data = new StringContent(JsonSerializer.Serialize(participant), Encoding.UTF8, "application/json");
         // Act
         var response = await _client.PostAsync(url, data);
@@ -77,7 +77,7 @@ public class UnitTest1 : IClassFixture<WebApplicationFactory<Program>>
     {
         // Arrange
         var url = "/participants";
-        var participant = new Participant("some-id") { Name = "John Doe", HomePhone = "123-45-6789" };
+        var participant = new Person("some-id") { Name = "John Doe", HomePhone = "123-45-6789" };
         var data = new StringContent(JsonSerializer.Serialize(participant), Encoding.UTF8, "application/json");
         // Act
         var response = await _client.PostAsync(url, data);
@@ -99,7 +99,7 @@ public class UnitTest1 : IClassFixture<WebApplicationFactory<Program>>
     {
         // Arrange
         var url = "/participants";
-        var participant = new Participant("some-id") { Name = "John Doe", MobilePhone = "123-45-6789" };
+        var participant = new Person("some-id") { Name = "John Doe", MobilePhone = "123-45-6789" };
         var data = new StringContent(JsonSerializer.Serialize(participant), Encoding.UTF8, "application/json");
         // Act
         var response = await _client.PostAsync(url, data);
@@ -121,7 +121,7 @@ public class UnitTest1 : IClassFixture<WebApplicationFactory<Program>>
     {
         // Arrange
         var url = "/participants";
-        var participant = new Participant("some-id") { Name = "John Doe", Address = new Address("123 Main St", "Ste 101", "Anytown", "NY", "USA", "75001") };
+        var participant = new Person("some-id") { Name = "John Doe", Address = new Address("123 Main St", "Ste 101", "Anytown", "NY", "USA", "75001") };
         var data = new StringContent(JsonSerializer.Serialize(participant), Encoding.UTF8, "application/json");
         // Act
         var response = await _client.PostAsync(url, data);

@@ -4,7 +4,7 @@ using Shared;
 
 namespace PersonEvents;
 
-public record Participant(string Id)
+public record Person(string Id) : Participant(Id)
 {
     public bool IsActive { get; set; }
     public string? Name { get; set; }
@@ -15,7 +15,7 @@ public record Participant(string Id)
     public string? Email { get; set; }
 }
 
-public record ParticipantRequest
+public record PersonRequest
 {
     public string? Name { get; set; }
     public string? SSN { get; set; }
@@ -25,31 +25,31 @@ public record ParticipantRequest
     public string? Email { get; set; }
 }
 
-public record ParticipantAcquired(string AggregateId) : Event("participant-acquired")
+public record PersonAcquired(string AggregateId) : Event("participant-acquired")
 {
-    public Participant? Participant { get; init; }
+    public Person? Participant { get; init; }
 }
-public record AddParticipantCommand(string AggregateId) : Command<ParticipantAcquired>
+public record AddPersonCommand(string AggregateId) : Command<PersonAcquired>
 {
-    public Participant? Participant { get; init; }
-    public override ParticipantAcquired ToEvent() => new(AggregateId) { 
+    public Person? Participant { get; init; }
+    public override PersonAcquired ToEvent() => new(AggregateId) { 
         Participant = Participant,
         OccuredAt = DateTimeOffset.UtcNow
     };
 }
-public class AddParticipantCommandHandler : IRequestHandler<AddParticipantCommand, ParticipantAcquired>
+public class AddPersonCommandHandler : IRequestHandler<AddPersonCommand, PersonAcquired>
 {
-    public Task<ParticipantAcquired> Handle(AddParticipantCommand request, CancellationToken cancellationToken)
+    public Task<PersonAcquired> Handle(AddPersonCommand request, CancellationToken cancellationToken)
     {
         return Task.FromResult(request.ToEvent());
     }
 }
 
-public class AddParticipantSlice(IEventStore eventStore, IUniquenessDataStore uniquenessDataStore, IMediator mediator) : Slice(mediator, eventStore)
+public class AddPersonSlice(IEventStore eventStore, IUniquenessDataStore uniquenessDataStore, IMediator mediator) : Slice(mediator, eventStore)
 {
-    public async Task<string> AddParticipant(ParticipantRequest request)
+    public async Task<string> AddParticipant(PersonRequest request)
     {
-        var participant = new Participant(GenerateIds.NewId())
+        var participant = new Person(GenerateIds.NewId())
         {
             Name = request.Name,
             SSN = request.SSN,
@@ -59,7 +59,7 @@ public class AddParticipantSlice(IEventStore eventStore, IUniquenessDataStore un
             Address = request.Address,
             Email = request.Email
         };
-        var addParticipantCommand = new AddParticipantCommand(participant.Id) { Participant = participant };
+        var addParticipantCommand = new AddPersonCommand(participant.Id) { Participant = participant };
 
         var participantAdded = await mediator.Send(addParticipantCommand); // This will trigger the pipeline behaviors. If the participant is not unique, an exception will be thrown.
         await eventStore.Append("participant", participantAdded); // We won't reach this point if the participant is not unique.
@@ -70,7 +70,4 @@ public class AddParticipantSlice(IEventStore eventStore, IUniquenessDataStore un
     }
 }
 
-public class ParticipantAlreadyExistsException(string message) : Exception(message)
-{
-    public string? ParticipantId { get; set; } 
-}
+

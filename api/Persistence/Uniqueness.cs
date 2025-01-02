@@ -5,8 +5,8 @@ namespace Persistence;
 
 public interface IUniquenessDataStore
 {
-    public Task Add(Participant participant);
-    public Task<Participant?> ById(string key);
+    public Task Add(Person participant);
+    public Task<Person?> ById(string key);
     public Task<string?> BySSN(string key);
     public Task<string?> ByNameAndHomePhoneNumber(string key);
     public Task<string?> ByNameAndMobilePhoneNumber(string key);
@@ -16,14 +16,14 @@ public interface IUniquenessDataStore
 }
 public class UniquenessMemoryDataStore : IUniquenessDataStore
 {
-    private readonly ConcurrentDictionary<string, Participant> ById = new();
+    private readonly ConcurrentDictionary<string, Person> ById = new();
     private readonly ConcurrentDictionary<string, string> BySSN = new();
     private readonly ConcurrentDictionary<string, string> ByNameAndHomePhoneNumber = new();
     private readonly ConcurrentDictionary<string, string> ByNameAndMobilePhoneNumber = new();
     private readonly ConcurrentDictionary<string, string> ByNameAndAddress = new();
     private readonly ConcurrentDictionary<string, string> ByNameAndEmail = new();
 
-    public Task Add(Participant participant)
+    public Task Add(Person participant)
     {
         if (!string.IsNullOrEmpty(participant.SSN))
             BySSN.TryAdd(participant.SSN, participant.Id);
@@ -45,7 +45,7 @@ public class UniquenessMemoryDataStore : IUniquenessDataStore
         return Task.CompletedTask;
     }
 
-    Task<Participant?> IUniquenessDataStore.ById(string key)
+    Task<Person?> IUniquenessDataStore.ById(string key)
     {
         return Task.FromResult(ById.TryGetValue(key, out var participant) ? participant : null);
     }

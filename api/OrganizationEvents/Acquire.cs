@@ -4,7 +4,7 @@ using Persistence;
 
 namespace OrganizationEvents;
 
-public record ParticipantOrganization(string Id)
+public record Organization(string Id) : Participant(Id)
 {
     public string? Name { get; set; }
     public string? EIN { get; set; }
@@ -13,11 +13,12 @@ public record ParticipantOrganization(string Id)
 
 public record ParticipantOrganizationAcquired(string AggregateId) : Event("participant-organization-acquired")
 {
-    public ParticipantOrganization? ParticipantOrganization { get; init; }
+    public Organization? ParticipantOrganization { get; init; }
 }
+
 public record AddParticipantOrganizationCommand(string AggregateId) : Command<ParticipantOrganizationAcquired>
 {
-    public ParticipantOrganization? ParticipantOrganization { get; init; }
+    public Organization? ParticipantOrganization { get; init; }
     public override ParticipantOrganizationAcquired ToEvent() => new(AggregateId) { 
         ParticipantOrganization = ParticipantOrganization,
         OccuredAt = DateTimeOffset.UtcNow
@@ -36,7 +37,7 @@ public class AddParticipantOrganizationSlice : Slice
 {
     public AddParticipantOrganizationSlice(IMediator mediator, IEventStore eventStore) : base(mediator, eventStore) { }
 
-    public async Task<string> AddParticipantOrganization(ParticipantOrganization participantOrganization)
+    public async Task<string> AddParticipantOrganization(Organization participantOrganization)
     {
         var addParticipantOrganizationCommand = new AddParticipantOrganizationCommand(participantOrganization.Id) { ParticipantOrganization = participantOrganization };
         var participantOrganizationAdded = await mediator.Send(addParticipantOrganizationCommand);

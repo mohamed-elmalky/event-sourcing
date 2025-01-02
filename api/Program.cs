@@ -18,11 +18,11 @@ builder.Services.AddSingleton<IEventStore>(eventStore);
 builder.Services.AddSingleton<IUniquenessDataStore>(uniquenessDataStore);
 builder.Services.AddSingleton<IMediator, Mediator>();
 
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqueBySSNBehavior<,>));
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqeByNameAndHomePhoneNumberBehavior<,>));
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqueByNameAndMobileNumberBehavior<,>));
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqueByNameAndEmailBehavior<,>));
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ParticipantUniqueByNameAndAddressBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PersonUniqueBySSNBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PersonUniqeByNameAndHomePhoneNumberBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PersonUniqueByNameAndMobileNumberBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PersonUniqueByNameAndEmailBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PersonUniqueByNameAndAddressBehavior<,>));
 
 var app = builder.Build();
 
@@ -31,9 +31,9 @@ var mediator = app.Services.GetRequiredService<IMediator>();
 app.MapGet("/", () => {
     return Results.Ok("Hello? Is it me you're looking for?");
 });
-app.MapPost("/participants", async (ParticipantRequest request) => 
+app.MapPost("/participants", async (PersonRequest request) => 
 {
-    var addParticipantSlice = new AddParticipantSlice(eventStore, uniquenessDataStore, mediator);
+    var addParticipantSlice = new AddPersonSlice(eventStore, uniquenessDataStore, mediator);
 
     try
     {
@@ -56,7 +56,7 @@ app.MapDelete("/participants/{id}", async (string id) => {
 app.MapGet("/participants/{id}", async (string id) => {
     var events = await eventStore.Load("participant", id);
     Console.WriteLine($"Events: {events.Count}");
-    var participantProjection = new ParticipantProjection();
+    var participantProjection = new PersonProjection();
     participantProjection.Load(events);
     return Results.Ok(participantProjection.Participants[id]);
 });
