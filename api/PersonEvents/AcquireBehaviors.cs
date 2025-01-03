@@ -1,7 +1,6 @@
 using MediatR;
 using Models;
 using Persistence;
-using Shared;
 
 namespace PersonEvents;
 

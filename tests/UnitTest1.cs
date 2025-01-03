@@ -133,4 +133,26 @@ public class UnitTest1 : IClassFixture<WebApplicationFactory<Program>>
         var id = json["id"]?.ToString();
         id.Should().Be(participantId);
     }
+
+    [Fact]
+    public async Task PATCH_Should_Change_Name()
+    {
+        // Arrange
+        var participant = new Person("some-id") { Name = "John Doe" };
+        var data = new StringContent(JsonSerializer.Serialize(participant), Encoding.UTF8, "application/json");
+        // Act
+        var response = await _client.PostAsync(_basePersonPath, data);
+        response.EnsureSuccessStatusCode();
+        var participantId = await response.Content.ReadFromJsonAsync<string>();
+
+        var newName = "Jane Doe";
+        var patch = participant with { Name = newName };
+        var patchData = new StringContent(JsonSerializer.Serialize(patch), Encoding.UTF8, "application/json");
+        // Act
+        var response2 = await _client.PatchAsync($"{_basePersonPath}/{participantId}", patchData);
+        // Assert
+        response2.EnsureSuccessStatusCode();
+        var updatedParticipant = await _client.GetFromJsonAsync<Person>($"{_basePersonPath}/{participantId}");
+        _ = updatedParticipant?.Name.Should().Be(newName);
+    }
 }
