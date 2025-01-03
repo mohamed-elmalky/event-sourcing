@@ -60,7 +60,7 @@ apiGroup.MapGet("/person/{id}", async (string id) => {
     return person != null ? Results.Ok(person) : Results.NotFound();
 });
 apiGroup.MapPatch("/person/{id}", async (string id, PersonRequest request) => {
-    
+    await new ModifyPerson(eventStore, mediator).Execute(request with { Id = id });
 });
 
 apiGroup.MapDelete("/participants/{id}", async (string id) => {

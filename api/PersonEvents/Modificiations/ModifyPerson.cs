@@ -10,25 +10,17 @@ public class ModifyPerson(IEventStore eventStore, IMediator mediator) : Slice(me
 {
     public async Task Execute(PersonRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Id))
-            throw new ArgumentException("Id is required");
+        if (string.IsNullOrWhiteSpace(request.Id)) throw new ArgumentException("Id is required");
 
         var events = await eventStore.Load(request.Id);
-        if (events.Count == 0)
-            throw new ArgumentException("Person not found");
+        if (events.Count == 0) throw new ArgumentException("No events found");
         
         var projection = new PersonProjection();
         projection.Load(events);
-        var person = projection.GetPersonById(request.Id);
-        if (person == null)
-            throw new ArgumentException("Person not found");
+        var person = projection.GetPersonById(request.Id) ?? throw new ArgumentException("Person not found");
 
-        var commands = GetCommandsBasedOnChanges(person, request);
-        foreach (var command in commands)
-        {
-            var @event = await mediator.Send(command);
-            await eventStore.Append("person", @event);
-        }
+        foreach (var command in GetCommandsBasedOnChanges(person, request))
+            _ = await mediator.Send(command);
     }
 
     private List<Command> GetCommandsBasedOnChanges(Person person, PersonRequest request)

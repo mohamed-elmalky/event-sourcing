@@ -5,12 +5,8 @@ using Shared;
 
 namespace PersonEvents;
 
-public class PersonUniqueByNameAndEmailBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : AddPersonCommand
+public class PersonUniqueByNameAndEmailBehavior<TRequest, TResponse>(IUniquenessDataStore uniquenessDataStore) : IPipelineBehavior<TRequest, TResponse> where TRequest : AddPersonCommand
 {
-    private readonly IUniquenessDataStore _uniquenessDataStore;
-
-    public PersonUniqueByNameAndEmailBehavior(IUniquenessDataStore uniquenessDataStore) => _uniquenessDataStore = uniquenessDataStore;
-
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         if (request.Participant is null || string.IsNullOrEmpty(request.Participant.Name) || string.IsNullOrEmpty(request.Participant.Email))
@@ -19,7 +15,7 @@ public class PersonUniqueByNameAndEmailBehavior<TRequest, TResponse> : IPipeline
             return await next();
         }
 
-        var participantId = await _uniquenessDataStore.ByNameAndEmail($"{request.Participant.Name}:{request.Participant.Email}");
+        var participantId = await uniquenessDataStore.ByNameAndEmail($"{request.Participant.Name}:{request.Participant.Email}");
         if (participantId is null)
             Console.WriteLine("\u2705 Name and email");
         else
@@ -37,12 +33,8 @@ public class PersonUniqueByNameAndEmailBehavior<TRequest, TResponse> : IPipeline
 /// </summary>
 /// <typeparam name="TRequest"></typeparam>
 /// <typeparam name="TResponse"></typeparam>
-public class PersonUniqeByNameAndHomePhoneNumberBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : AddPersonCommand
+public class PersonUniqeByNameAndHomePhoneNumberBehavior<TRequest, TResponse>(IUniquenessDataStore uniquenessDataStore) : IPipelineBehavior<TRequest, TResponse> where TRequest : AddPersonCommand
 {
-    private readonly IUniquenessDataStore _uniquenessDataStore;
-
-    public PersonUniqeByNameAndHomePhoneNumberBehavior(IUniquenessDataStore uniquenessDataStore) => _uniquenessDataStore = uniquenessDataStore;
-
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         if (request.Participant is null || string.IsNullOrEmpty(request.Participant.Name) || string.IsNullOrEmpty(request.Participant.HomePhone))
@@ -51,7 +43,7 @@ public class PersonUniqeByNameAndHomePhoneNumberBehavior<TRequest, TResponse> : 
             return await next();
         }
 
-        var participantId = await _uniquenessDataStore.ByNameAndHomePhoneNumber($"{request.Participant.Name}:{request.Participant.HomePhone}");
+        var participantId = await uniquenessDataStore.ByNameAndHomePhoneNumber($"{request.Participant.Name}:{request.Participant.HomePhone}");
         if (participantId is null)
             Console.WriteLine("\u2705 Name and home phone number");
         else
@@ -64,12 +56,8 @@ public class PersonUniqeByNameAndHomePhoneNumberBehavior<TRequest, TResponse> : 
     }
 }
 
-public class PersonUniqueByNameAndMobileNumberBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : AddPersonCommand
+public class PersonUniqueByNameAndMobileNumberBehavior<TRequest, TResponse>(IUniquenessDataStore uniquenessDataStore) : IPipelineBehavior<TRequest, TResponse> where TRequest : AddPersonCommand
 {
-    private readonly IUniquenessDataStore _uniquenessDataStore;
-
-    public PersonUniqueByNameAndMobileNumberBehavior(IUniquenessDataStore uniquenessDataStore) => _uniquenessDataStore = uniquenessDataStore;
-
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         if (request.Participant is null || string.IsNullOrEmpty(request.Participant.Name) || string.IsNullOrEmpty(request.Participant.MobilePhone))
@@ -78,7 +66,7 @@ public class PersonUniqueByNameAndMobileNumberBehavior<TRequest, TResponse> : IP
             return await next();
         }
 
-        var participantId = await _uniquenessDataStore.ByNameAndMobilePhoneNumber($"{request.Participant.Name}:{request.Participant.MobilePhone}");
+        var participantId = await uniquenessDataStore.ByNameAndMobilePhoneNumber($"{request.Participant.Name}:{request.Participant.MobilePhone}");
         if (participantId is null)
             Console.WriteLine("\u2705 Name and mobile phone number");
         else
@@ -96,12 +84,8 @@ public class PersonUniqueByNameAndMobileNumberBehavior<TRequest, TResponse> : IP
 /// </summary>
 /// <typeparam name="TRequest"></typeparam>
 /// <typeparam name="TResponse"></typeparam>
-public class PersonUniqueBySSNBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : AddPersonCommand where TResponse : PersonAcquired
+public class PersonUniqueBySSNBehavior<TRequest, TResponse>(IUniquenessDataStore uniquenessDataStore) : IPipelineBehavior<TRequest, TResponse> where TRequest : AddPersonCommand where TResponse : PersonAcquired
 {
-    private readonly IUniquenessDataStore _uniquenessDataStore;
-
-    public PersonUniqueBySSNBehavior(IUniquenessDataStore uniquenessDataStore) => _uniquenessDataStore = uniquenessDataStore;
-
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         if (request.Participant is null || string.IsNullOrEmpty(request.Participant.SSN))
@@ -110,7 +94,7 @@ public class PersonUniqueBySSNBehavior<TRequest, TResponse> : IPipelineBehavior<
             return await next();
         }
 
-        var participantId = await _uniquenessDataStore.BySSN(request.Participant.SSN);
+        var participantId = await uniquenessDataStore.BySSN(request.Participant.SSN);
         if (participantId is null)
         {
             Console.WriteLine("\u2705 SSN");
@@ -125,12 +109,8 @@ public class PersonUniqueBySSNBehavior<TRequest, TResponse> : IPipelineBehavior<
     }
 }
 
-public class PersonUniqueByNameAndAddressBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : AddPersonCommand
+public class PersonUniqueByNameAndAddressBehavior<TRequest, TResponse>(IUniquenessDataStore uniquenessDataStore) : IPipelineBehavior<TRequest, TResponse> where TRequest : AddPersonCommand
 {
-    private readonly IUniquenessDataStore _uniquenessDataStore;
-
-    public PersonUniqueByNameAndAddressBehavior(IUniquenessDataStore uniquenessDataStore) => _uniquenessDataStore = uniquenessDataStore;
-
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         if (request.Participant is null || string.IsNullOrEmpty(request.Participant.Name) || request.Participant.Address is null)
@@ -139,7 +119,7 @@ public class PersonUniqueByNameAndAddressBehavior<TRequest, TResponse> : IPipeli
             return await next();
         }
 
-        var participantId = await _uniquenessDataStore.ByNameAndAddress($"{request.Participant.Name}:{request.Participant.Address}");
+        var participantId = await uniquenessDataStore.ByNameAndAddress($"{request.Participant.Name}:{request.Participant.Address}");
         if (participantId is null)
             Console.WriteLine("\u2705 Name and address");
         else
