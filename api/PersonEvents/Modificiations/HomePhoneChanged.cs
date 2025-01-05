@@ -23,7 +23,7 @@ public class ModifyPersonHomePhoneCommandHandler(IEventStore eventStore) : IRequ
     public async Task<PersonHomePhoneChanged> Handle(ModifyPersonHomePhoneCommand request, CancellationToken cancellationToken)
     {
         var @event = request.ToEvent();
-        await eventStore.Append(@event.Kind, @event);
+        await eventStore.Append(@event);
         return @event;
     }
 }

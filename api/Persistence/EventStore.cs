@@ -7,6 +7,7 @@ public interface IEventStore
 {
     Task<List<Event>> Load(string aggregateId);
     Task<List<Event>> Load(string aggregateType, string aggregateId);
+    Task Append(Event e);
     Task Append(string aggregateType, Event e);
 }
 
@@ -15,6 +16,13 @@ public class MemoryEventStore : IEventStore
     public const string PARTICIPANT_TYPE = "participant";
     private readonly ConcurrentDictionary<string, List<Event>> _store = new();
     private string Key(string aggregateType, string aggregateId) => $"{aggregateType.ToLower()}:{aggregateId}";
+
+    public Task Append(Event e)
+    {
+        var list = _store.GetOrAdd(Key(PARTICIPANT_TYPE, e.AggregateId), []);
+        list.Add(e);
+        return Task.CompletedTask;
+    }
 
     public Task Append(string aggregateType, Event e)
     {

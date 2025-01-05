@@ -135,24 +135,27 @@ public class UnitTest1 : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task PATCH_Should_Change_Name()
+    public async Task PATCH_Should_Change_HomePhone()
     {
         // Arrange
-        var participant = new Person("some-id") { Name = "John Doe" };
-        var data = new StringContent(JsonSerializer.Serialize(participant), Encoding.UTF8, "application/json");
+        var person = new Person(Guid.NewGuid().ToString()) { Name = Faker.Name.FullName(), HomePhone = Faker.Phone.Number() };
+        var data = new StringContent(JsonSerializer.Serialize(person), Encoding.UTF8, "application/json");
         // Act
         var response = await _client.PostAsync(_basePersonPath, data);
+        // Assert
         response.EnsureSuccessStatusCode();
         var participantId = await response.Content.ReadFromJsonAsync<string>();
 
-        var newName = "Jane Doe";
-        var patch = participant with { Name = newName };
-        var patchData = new StringContent(JsonSerializer.Serialize(patch), Encoding.UTF8, "application/json");
-        // Act
+        // change the home phone
+        var newHomePhone = Faker.Phone.Number();
+        var patchData = new StringContent(JsonSerializer.Serialize(new { HomePhone = newHomePhone }), Encoding.UTF8, "application/json");
         var response2 = await _client.PatchAsync($"{_basePersonPath}/{participantId}", patchData);
-        // Assert
         response2.EnsureSuccessStatusCode();
-        var updatedParticipant = await _client.GetFromJsonAsync<Person>($"{_basePersonPath}/{participantId}");
-        _ = updatedParticipant?.Name.Should().Be(newName);
+
+        // get the participant
+        var response3 = await _client.GetAsync($"{_basePersonPath}/{participantId}");
+        response3.EnsureSuccessStatusCode();
+        var personPatched = await response3.Content.ReadFromJsonAsync<Person>();
+        personPatched?.HomePhone.Should().Be(newHomePhone);
     }
 }

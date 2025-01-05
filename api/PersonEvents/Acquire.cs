@@ -33,7 +33,7 @@ public class AddPersonSlice(IEventStore eventStore, IUniquenessDataStore uniquen
         var addParticipantCommand = new AddPersonCommand(participant.Id) { Participant = participant };
 
         var participantAdded = await mediator.Send(addParticipantCommand); // This will trigger the pipeline behaviors. If the participant is not unique, an exception will be thrown.
-        await eventStore.Append("participant", participantAdded); // We won't reach this point if the participant is not unique.
+        await eventStore.Append(participantAdded); // We won't reach this point if the participant is not unique.
         await uniquenessDataStore.Add(participant);
         
         Console.WriteLine($"Participant added: {participant.Id}");

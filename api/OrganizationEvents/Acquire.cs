@@ -56,7 +56,7 @@ public class AddOrganizationSlice : Slice
     {
         var addParticipantOrganizationCommand = new AddOrganizationCommand(participantOrganization.Id) { ParticipantOrganization = participantOrganization };
         var participantOrganizationAdded = await mediator.Send(addParticipantOrganizationCommand);
-        await eventStore.Append("participant-organization", participantOrganizationAdded);
+        await eventStore.Append(participantOrganizationAdded);
         Console.WriteLine($"Participant organization added: {participantOrganization.Id}");
         return participantOrganization.Id;
     }

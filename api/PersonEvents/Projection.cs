@@ -28,6 +28,9 @@ public class PersonProjection
             case ParticipantDeactivated participantDeactivated:
                 Participants[participantDeactivated.AggregateId].IsActive = false;
                 break;
+            case PersonHomePhoneChanged personHomePhoneChanged:
+                Participants[personHomePhoneChanged.AggregateId].HomePhone = personHomePhoneChanged.HomePhone;
+                break;
         }
     }
 }

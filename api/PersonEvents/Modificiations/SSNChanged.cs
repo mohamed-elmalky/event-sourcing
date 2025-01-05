@@ -23,7 +23,7 @@ public class ModifyPersonSSNCommandHandler(IEventStore eventStore) : IRequestHan
     public async Task<PersonSSNChanged> Handle(ModifyPersonSSNCommand request, CancellationToken cancellationToken)
     {
         var @event = request.ToEvent();
-        await eventStore.Append(@event.Kind, @event);
+        await eventStore.Append(@event);
         return @event;
     }
 }
